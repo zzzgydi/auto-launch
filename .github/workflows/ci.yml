@@ -34,5 +34,7 @@ jobs:
 
       - name: Run cargo test
         run: |
-          cd test-exe && cargo build --release
+          cd test-exe
+          cargo build --release
+          cd ..
           cargo test
