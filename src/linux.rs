@@ -55,27 +55,3 @@ impl AutoLaunch<'_> {
 fn get_dir() -> PathBuf {
     dirs::home_dir().unwrap().join(".config").join("autostart")
 }
-
-#[test]
-fn test_linux() {
-    let app_name = "AutoLaunchTest";
-    let app_path = "/Applications/Calculator.app";
-
-    // default test
-    let auto_launch = AutoLaunch::new(app_name, app_path, false);
-
-    assert_eq!(auto_launch.is_enabled().unwrap(), false);
-    assert!(auto_launch.enable().is_ok());
-    assert_eq!(auto_launch.is_enabled().unwrap(), true);
-    assert!(auto_launch.disable().is_ok());
-    assert_eq!(auto_launch.is_enabled().unwrap(), false);
-
-    // test hidden
-    let auto_launch = AutoLaunch::new(app_name, app_path, true);
-
-    assert_eq!(auto_launch.is_enabled().unwrap(), false);
-    assert!(auto_launch.enable().is_ok());
-    assert_eq!(auto_launch.is_enabled().unwrap(), true);
-    assert!(auto_launch.disable().is_ok());
-    assert_eq!(auto_launch.is_enabled().unwrap(), false);
-}

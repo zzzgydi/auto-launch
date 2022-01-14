@@ -30,17 +30,3 @@ impl AutoLaunch<'_> {
             .is_ok())
     }
 }
-
-#[test]
-fn test_win() {
-    let app_name = "AutoLaunchTest";
-    let app_path = r"C:\Program Files\clash-verge\clash-verge.exe";
-
-    let auto_launch = AutoLaunch::new(app_name, app_path);
-
-    assert_eq!(auto_launch.is_enabled().unwrap(), false);
-    assert!(auto_launch.enable().is_ok());
-    assert_eq!(auto_launch.is_enabled().unwrap(), true);
-    assert!(auto_launch.disable().is_ok());
-    assert_eq!(auto_launch.is_enabled().unwrap(), false);
-}
