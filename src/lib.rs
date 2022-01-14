@@ -17,3 +17,18 @@ pub struct AutoLaunch<'a> {
     #[cfg(not(target_os = "windows"))]
     pub(crate) hidden: bool,
 }
+
+impl AutoLaunch<'_> {
+    pub fn get_app_name(&self) -> &str {
+        self.app_name
+    }
+
+    pub fn get_app_path(&self) -> &str {
+        self.app_path
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    pub fn is_hidden(&self) -> bool {
+        self.hidden
+    }
+}

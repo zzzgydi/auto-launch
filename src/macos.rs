@@ -1,7 +1,7 @@
 use crate::AutoLaunch;
 use std::fs;
-use std::io::{Error, Result, Write};
-use std::path::PathBuf;
+use std::io::{Error, ErrorKind, Result, Write};
+use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
 impl AutoLaunch<'_> {
@@ -11,8 +11,21 @@ impl AutoLaunch<'_> {
         use_launch_agent: bool,
         hidden: bool,
     ) -> AutoLaunch<'a> {
+        let mut name = app_name;
+        if !use_launch_agent {
+            // the app_name should be same as the executable's name
+            // when using login item
+            let end = if app_path.ends_with(".app") { 4 } else { 0 };
+            let end = app_path.len() - end;
+            let begin = match app_path.rfind('/') {
+                Some(i) => i + 1,
+                None => 0,
+            };
+            name = &app_path[begin..end];
+        }
+
         AutoLaunch::<'a> {
-            app_name,
+            app_name: name,
             app_path,
             use_launch_agent,
             hidden,
@@ -20,6 +33,11 @@ impl AutoLaunch<'_> {
     }
 
     pub fn enable(&self) -> Result<()> {
+        let path = Path::new(self.app_path);
+        if !path.exists() || !path.is_absolute() {
+            return Err(Error::from(ErrorKind::InvalidInput));
+        }
+
         if self.use_launch_agent {
             let dir = get_dir();
             if !dir.exists() {
@@ -58,8 +76,8 @@ impl AutoLaunch<'_> {
             Ok(())
         } else {
             let props = format!(
-                "{{path:\"{}\", hidden:{}, name:\"{}\"}}",
-                self.app_path, self.hidden, self.app_name
+                "{{name:\"{}\",path:\"{}\",hidden:{}}}",
+                self.app_name, self.app_path, self.hidden
             );
             let command = format!("make login item at end with properties {}", props);
             let output = exec_apple_script(&command)?;
@@ -80,7 +98,7 @@ impl AutoLaunch<'_> {
                 Ok(())
             }
         } else {
-            let command = format!("delete login item {}", self.app_name);
+            let command = format!("delete login item \"{}\"", self.app_name);
             let output = exec_apple_script(&command)?;
             if output.status.success() {
                 Ok(())
@@ -98,9 +116,8 @@ impl AutoLaunch<'_> {
             let output = exec_apple_script(command)?;
             let mut enable = false;
             if output.status.success() {
-                let mut stdout = std::str::from_utf8(&output.stdout)
-                    .unwrap_or("")
-                    .split(", ");
+                let stdout = std::str::from_utf8(&output.stdout).unwrap_or("");
+                let mut stdout = stdout.split(",").map(|x| x.trim());
                 enable = stdout.find(|x| x == &self.app_name).is_some();
             }
             Ok(enable)
@@ -124,52 +141,4 @@ fn exec_apple_script(cmd_suffix: &str) -> Result<Output> {
     Command::new("osascript")
         .args(vec!["-e", &command])
         .output()
-}
-
-#[test]
-fn test_macos_osascript() {
-    let app_name = "AutoLaunchTest";
-    let app_path = "/Applications/Calculator.app";
-
-    // default test
-    let auto_launch = AutoLaunch::new(app_name, app_path, false, false);
-
-    assert_eq!(auto_launch.is_enabled().unwrap(), false);
-    assert!(auto_launch.enable().is_ok());
-    assert_eq!(auto_launch.is_enabled().unwrap(), true);
-    assert!(auto_launch.disable().is_ok());
-    assert_eq!(auto_launch.is_enabled().unwrap(), false);
-
-    // test hidden
-    let auto_launch = AutoLaunch::new(app_name, app_path, false, true);
-
-    assert_eq!(auto_launch.is_enabled().unwrap(), false);
-    assert!(auto_launch.enable().is_ok());
-    assert_eq!(auto_launch.is_enabled().unwrap(), true);
-    assert!(auto_launch.disable().is_ok());
-    assert_eq!(auto_launch.is_enabled().unwrap(), false);
-}
-
-#[test]
-fn test_macos_user_launch() {
-    let app_name = "AutoLaunchTest";
-    let app_path = "/Applications/Calculator.app";
-
-    // default test
-    let auto_launch = AutoLaunch::new(app_name, app_path, true, false);
-
-    assert_eq!(auto_launch.is_enabled().unwrap(), false);
-    assert!(auto_launch.enable().is_ok());
-    assert_eq!(auto_launch.is_enabled().unwrap(), true);
-    assert!(auto_launch.disable().is_ok());
-    assert_eq!(auto_launch.is_enabled().unwrap(), false);
-
-    // test hidden
-    let auto_launch = AutoLaunch::new(app_name, app_path, true, true);
-
-    assert_eq!(auto_launch.is_enabled().unwrap(), false);
-    assert!(auto_launch.enable().is_ok());
-    assert_eq!(auto_launch.is_enabled().unwrap(), true);
-    assert!(auto_launch.disable().is_ok());
-    assert_eq!(auto_launch.is_enabled().unwrap(), false);
 }
