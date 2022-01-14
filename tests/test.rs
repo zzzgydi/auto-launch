@@ -4,9 +4,15 @@ mod union_tests {
     use std::env::current_dir;
 
     fn get_test_bin() -> String {
+        let test_bin = if cfg!(target_os = "windows") {
+            "auto-launch-test.exe"
+        } else {
+            "auto-launch-test"
+        };
         let test_bin = current_dir()
             .unwrap()
-            .join("test-exe/target/release/auto-launch-test");
+            .join("test-exe/target/release")
+            .join(test_bin);
 
         // if not exists, check the test exe
         assert!(test_bin.exists());
