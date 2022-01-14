@@ -8,10 +8,7 @@ readme = "README.md"
 repository = "https://github.com/zzzgydi/auto-launch.git"
 keywords = ["launch", "auto launch", "startup", "login", "login-items"]
 
-[target.'cfg(linux)'.dependencies]
-dirs = "4.0"
-
-[target.'cfg(macos)'.dependencies]
+[target."cfg(not(target_os = \"windows\"))".dependencies]
 dirs = "4.0"
 
 [target.'cfg(windows)'.dependencies]
