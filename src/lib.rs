@@ -19,12 +19,12 @@
 //!     let auto = AutoLaunch::new(app_name, app_path, false);
 //!
 //!     // enable the auto launch
-//!     assets!(auto.enable().is_ok());
-//!     assets!(auto.is_enabled().unwrap());
+//!     assert!(auto.enable().is_ok());
+//!     assert!(auto.is_enabled().unwrap());
 //!
 //!     // disable the auto launch
-//!     assets!(auto.disable().is_ok());
-//!     assets!(!auto.is_enabled().unwrap());
+//!     assert!(auto.disable().is_ok());
+//!     assert!(!auto.is_enabled().unwrap());
 //! }
 //! ```
 //!
@@ -48,12 +48,12 @@
 //!     let auto = AutoLaunch::new(app_name, app_path, false, false);
 //!     
 //!     // enable the auto launch
-//!     assets!(auto.enable().is_ok());
-//!     assets!(auto.is_enabled().unwrap());
+//!     assert!(auto.enable().is_ok());
+//!     assert!(auto.is_enabled().unwrap());
 //!
 //!     // disable the auto launch
-//!     assets!(auto.disable().is_ok());
-//!     assets!(!auto.is_enabled().unwrap());
+//!     assert!(auto.disable().is_ok());
+//!     assert!(!auto.is_enabled().unwrap());
 //! }
 //! ```
 //!
@@ -71,12 +71,12 @@
 //!     let auto = AutoLaunch::new(app_name, app_path);
 //!
 //!     // enable the auto launch
-//!     assets!(auto.enable().is_ok());
-//!     assets!(auto.is_enabled().unwrap());
+//!     assert!(auto.enable().is_ok());
+//!     assert!(auto.is_enabled().unwrap());
 //!
 //!     // disable the auto launch
-//!     assets!(auto.disable().is_ok());
-//!     assets!(!auto.is_enabled().unwrap());
+//!     assert!(auto.disable().is_ok());
+//!     assert!(!auto.is_enabled().unwrap());
 //! }
 //! ```
 //!
