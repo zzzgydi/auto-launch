@@ -4,7 +4,15 @@ use std::io::{Error, ErrorKind, Result, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
+/// Macos implment
 impl AutoLaunch<'_> {
+    /// Create a new AutoLaunch instance
+    /// - `app_name`: application name, should be same as the basename of the `app_path`
+    ///     when `use_launch_agent` is false, or it will be corrected automatically.
+    /// - `app_path`: application path, should be the **absolute path** and **exists**,
+    ///     otherwise it will cause an error when `enable`.
+    /// - `use_launch_agent`: whether use Launch Agent or AppleScript.
+    /// - `hidden`: whether hidden the application on launch or not.
     pub fn new<'a>(
         app_name: &'a str,
         app_path: &'a str,
@@ -32,6 +40,7 @@ impl AutoLaunch<'_> {
         }
     }
 
+    /// Enable the AutoLaunch setting
     pub fn enable(&self) -> Result<()> {
         let path = Path::new(self.app_path);
         if !path.exists() || !path.is_absolute() {
@@ -89,6 +98,7 @@ impl AutoLaunch<'_> {
         }
     }
 
+    /// Disable the AutoLaunch setting
     pub fn disable(&self) -> Result<()> {
         if self.use_launch_agent {
             let file = self.get_file();
@@ -108,6 +118,7 @@ impl AutoLaunch<'_> {
         }
     }
 
+    /// Check whether the AutoLaunch setting is enabled
     pub fn is_enabled(&self) -> Result<bool> {
         if self.use_launch_agent {
             Ok(self.get_file().exists())
@@ -124,11 +135,13 @@ impl AutoLaunch<'_> {
         }
     }
 
+    /// get the plist file path
     fn get_file(&self) -> PathBuf {
         get_dir().join(format!("{}.plist", self.app_name))
     }
 }
 
+/// Get the Launch Agent Dir
 fn get_dir() -> PathBuf {
     dirs::home_dir()
         .unwrap()
@@ -136,6 +149,7 @@ fn get_dir() -> PathBuf {
         .join("LaunchAgents")
 }
 
+/// Execute the specific AppleScript
 fn exec_apple_script(cmd_suffix: &str) -> Result<Output> {
     let command = format!("tell application \"System Events\" to {}", cmd_suffix);
     Command::new("osascript")
