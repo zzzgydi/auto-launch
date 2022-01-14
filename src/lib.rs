@@ -11,6 +11,8 @@
 //! On Linux, it supports `hidden` parameter which means that hidden the app on launch.
 //!
 //! ```rust
+//! # #[cfg(target_os = "linux")]
+//! # mod linux {
 //! use auto_launch::AutoLaunch;
 //!
 //! fn main() {
@@ -19,13 +21,14 @@
 //!     let auto = AutoLaunch::new(app_name, app_path, false);
 //!
 //!     // enable the auto launch
-//!     assert!(auto.enable().is_ok());
-//!     assert!(auto.is_enabled().unwrap());
+//!     auto.enable().is_ok();
+//!     auto.is_enabled().unwrap();
 //!
 //!     // disable the auto launch
-//!     assert!(auto.disable().is_ok());
-//!     assert!(!auto.is_enabled().unwrap());
+//!     auto.disable().is_ok();
+//!     auto.is_enabled().unwrap();
 //! }
+//! # }
 //! ```
 //!
 //! ### Macos
@@ -39,22 +42,24 @@
 //! - When in the AppleScript way, the `app_name` should be same as the basename of `app_path`, or it will be corrected automately.
 //!
 //! ```rust
+//! # #[cfg(target_os = "macos")]
+//! # mod macos {
 //! use auto_launch::AutoLaunch;
 //!
-//! #[cfg(target_os = "macos")]
 //! fn main() {
 //!     let app_name = "the-app";
 //!     let app_path = "/path/to/the-app.app";
 //!     let auto = AutoLaunch::new(app_name, app_path, false, false);
 //!     
 //!     // enable the auto launch
-//!     assert!(auto.enable().is_ok());
-//!     assert!(auto.is_enabled().unwrap());
+//!     auto.enable().is_ok();
+//!     auto.is_enabled().unwrap();
 //!
 //!     // disable the auto launch
-//!     assert!(auto.disable().is_ok());
-//!     assert!(!auto.is_enabled().unwrap());
+//!     auto.disable().is_ok();
+//!     auto.is_enabled().unwrap();
 //! }
+//! # }
 //! ```
 //!
 //! ### Windows
@@ -62,22 +67,24 @@
 //! On Windows, it will add a registry entry under `\HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\CurrentVersion\Run`.
 //!
 //! ```rust
+//! # #[cfg(target_os = "windows")]
+//! # mod win {
 //! use auto_launch::AutoLaunch;
 //!
-//! #[cfg(target_os = "macos")]
 //! fn main() {
 //!     let app_name = "the-app";
 //!     let app_path = "C:\\path\\to\\the-app.exe";
 //!     let auto = AutoLaunch::new(app_name, app_path);
 //!
 //!     // enable the auto launch
-//!     assert!(auto.enable().is_ok());
-//!     assert!(auto.is_enabled().unwrap());
+//!     auto.enable().is_ok();
+//!     auto.is_enabled().unwrap();
 //!
 //!     // disable the auto launch
-//!     assert!(auto.disable().is_ok());
-//!     assert!(!auto.is_enabled().unwrap());
+//!     auto.disable().is_ok();
+//!     auto.is_enabled().unwrap();
 //! }
+//! # }
 //! ```
 //!
 
