@@ -7,6 +7,8 @@ license = "MIT"
 readme = "README.md"
 repository = "https://github.com/zzzgydi/auto-launch.git"
 keywords = ["launch", "auto launch", "startup", "login", "login-items"]
+description = "Auto launch any application or executable at startup. Supports Windows, Macos, and Linux."
+exclude = ["/test-exe"]
 
 [target."cfg(not(target_os = \"windows\"))".dependencies]
 dirs = "4.0"
