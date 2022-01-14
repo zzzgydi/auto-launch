@@ -33,4 +33,6 @@ jobs:
         run: cargo check
 
       - name: Run cargo test
-        run: cargo test
+        run: |
+          cd test-exe && cargo build --release
+          cargo test
