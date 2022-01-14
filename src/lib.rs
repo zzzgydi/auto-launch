@@ -3,7 +3,7 @@
 //! ## Usage
 //!
 //! The parameters of `AutoLaunch::new` are different on each os.
-//! See the function definition of the demo below for details.
+//! See the function definition or the demo below for details.
 //!
 //!
 //! ### Linux
@@ -33,7 +33,7 @@
 //!
 //! ### Macos
 //!
-//! Macos supports two way to achieve auto launch (via AppleScript or Launch Agent).
+//! Macos supports two ways to achieve auto launch (via AppleScript or Launch Agent).
 //! When the `use_launch_agent` is true, it will achieve by Launch Agent, otherwise by AppleScript.
 //! On Macos, it supports `hidden` parameter which means that hidden the app on launch.
 //!
