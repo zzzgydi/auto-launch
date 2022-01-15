@@ -1,8 +1,12 @@
 # Auto Launch
 
+[![Crates.io](https://img.shields.io/crates/v/auto-launch)](https://crates.io/crates/auto-launch)
+[![API reference](https://img.shields.io/docsrs/auto-launch/latest)](https://docs.rs/auto-launch/)
+[![License](https://img.shields.io/crates/l/auto-launch)](./LICENSE)
+
 Auto launch any application or executable at startup. Supports Windows, Mac (via AppleScript or Launch Agent), and Linux.
 
-As for `how does it work`, see [here](https://github.com/Teamwork/node-auto-launch#how-does-it-work) for details.
+How does it work? See [Teamwork/node-auto-launch](https://github.com/Teamwork/node-auto-launch#how-does-it-work) for details.
 
 If you find any bugs, welcome to PR or issue.
 
