@@ -15,6 +15,8 @@ If you find any bugs, welcome to PR or issue.
 The parameters of `AutoLaunch::new` are different on each platform.
 See the function definition or the demo below for details.
 
+Or you can construct the AutoLaunch by using `AutoLaunchBuilder`.
+
 ### Linux
 
 On Linux, it supports `hidden` parameter which means that hidden the app on launch.
@@ -85,6 +87,31 @@ fn main() {
     // disable the auto launch
     auto.disable().is_ok();
     auto.is_enabled().unwrap();
+}
+```
+
+### Builder
+
+AutoLaunch Builder helps to eliminate the constructor difference on various platforms.
+
+```rust
+use auto_launch::*;
+
+fn main() -> std::io::Result<()> {
+    let auto = AutoLaunchBuilder::new()
+        .set_app_name("the-app")
+        .set_app_path("/path/to/the-app")
+        .set_use_launch_agent(true)
+        .set_hidden(true)
+        .build();
+
+    auto.enable()?;
+    auto.is_enabled()?;
+
+    auto.disable()?;
+    auto.is_enabled()?;
+
+    Ok(())
 }
 ```
 
