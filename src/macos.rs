@@ -5,20 +5,23 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
 /// Macos implment
-impl AutoLaunch<'_> {
+impl AutoLaunch {
     /// Create a new AutoLaunch instance
-    /// - `app_name`: application name, should be same as the basename of the `app_path`
-    ///     when `use_launch_agent` is false, or it will be corrected automatically.
-    /// - `app_path`: application path, should be the **absolute path** and **exists**,
-    ///     otherwise it will cause an error when `enable`.
+    /// - `app_name`: application name
+    /// - `app_path`: application path
     /// - `use_launch_agent`: whether use Launch Agent or AppleScript.
     /// - `hidden`: whether hidden the application on launch or not.
-    pub fn new<'a>(
-        app_name: &'a str,
-        app_path: &'a str,
-        use_launch_agent: bool,
-        hidden: bool,
-    ) -> AutoLaunch<'a> {
+    ///
+    /// ## Notes
+    ///
+    /// The parameters of `AutoLaunch::new` are different on each platform.
+    ///
+    /// The `app_name` should be same as the basename of the `app_path`
+    ///     when `use_launch_agent` is false, or it will be corrected automatically.
+    ///
+    /// The `app_path` should be the **absolute path** and **exists**,
+    ///     otherwise it will cause an error when `enable`.
+    pub fn new(app_name: &str, app_path: &str, use_launch_agent: bool, hidden: bool) -> AutoLaunch {
         let mut name = app_name;
         if !use_launch_agent {
             // the app_name should be same as the executable's name
@@ -32,17 +35,32 @@ impl AutoLaunch<'_> {
             name = &app_path[begin..end];
         }
 
-        AutoLaunch::<'a> {
-            app_name: name,
-            app_path,
+        AutoLaunch {
+            app_name: name.into(),
+            app_path: app_path.into(),
             use_launch_agent,
             hidden,
         }
     }
 
     /// Enable the AutoLaunch setting
+    ///
+    /// ## Errors
+    ///
+    /// - `app_path` does not exist
+    /// - `app_path` is not absolute
+    ///
+    /// #### Launch Agent
+    ///
+    /// - failed to create dir `~/Library/LaunchAgents`
+    /// - failed to create file `~/Library/LaunchAgents/{app_name}.plist`
+    /// - failed to write bytes to the file
+    ///
+    /// #### AppleScript
+    ///
+    /// - failed to execute the `osascript` command, check the exit status or stderr for details
     pub fn enable(&self) -> Result<()> {
-        let path = Path::new(self.app_path);
+        let path = Path::new(&self.app_path);
         if !path.exists() || !path.is_absolute() {
             return Err(Error::from(ErrorKind::InvalidInput));
         }
@@ -53,7 +71,7 @@ impl AutoLaunch<'_> {
                 fs::create_dir(&dir)?;
             }
 
-            let mut args = vec![self.app_path];
+            let mut args = vec![self.app_path.as_str()];
 
             if self.hidden {
                 args.push("--hidden");
@@ -99,6 +117,16 @@ impl AutoLaunch<'_> {
     }
 
     /// Disable the AutoLaunch setting
+    ///
+    /// ## Errors
+    ///
+    /// #### Launch Agent
+    ///
+    /// - failed to remove file `~/Library/LaunchAgents/{app_name}.plist`
+    ///
+    /// #### AppleScript
+    ///
+    /// - failed to execute the `osascript` command, check the exit status or stderr for details
     pub fn disable(&self) -> Result<()> {
         if self.use_launch_agent {
             let file = self.get_file();

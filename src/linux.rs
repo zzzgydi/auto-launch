@@ -4,20 +4,30 @@ use std::io::{Result, Write};
 use std::path::PathBuf;
 
 /// Linux implement
-impl AutoLaunch<'_> {
+impl AutoLaunch {
     /// Create a new AutoLaunch instance
     /// - `app_name`: application name
     /// - `app_path`: application path
     /// - `hidden`: whether hidden the application on launch or not.
-    pub fn new<'a>(app_name: &'a str, app_path: &'a str, hidden: bool) -> AutoLaunch<'a> {
-        AutoLaunch::<'a> {
-            app_name,
-            app_path,
+    ///
+    /// ## Notes
+    ///
+    /// The parameters of `AutoLaunch::new` are different on each platform.
+    pub fn new(app_name: &str, app_path: &str, hidden: bool) -> AutoLaunch {
+        AutoLaunch {
+            app_name: app_name.into(),
+            app_path: app_path.into(),
             hidden,
         }
     }
 
     /// Enable the AutoLaunch setting
+    ///
+    /// ## Errors
+    ///
+    /// - failed to create dir `~/.config/autostart`
+    /// - failed to create file `~/.config/autostart/{app_name}.desktop`
+    /// - failed to write bytes to the file
     pub fn enable(&self) -> Result<()> {
         let hidden = if self.hidden { " --hidden" } else { "" };
         let data = format!(
@@ -41,6 +51,10 @@ impl AutoLaunch<'_> {
     }
 
     /// Disable the AutoLaunch setting
+    ///
+    /// ## Errors
+    ///
+    /// - failed to remove file `~/.config/autostart/{app_name}.desktop`
     pub fn disable(&self) -> Result<()> {
         let file = self.get_file();
         if file.exists() {

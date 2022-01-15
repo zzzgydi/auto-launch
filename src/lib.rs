@@ -2,7 +2,7 @@
 //!
 //! ## Usage
 //!
-//! The parameters of `AutoLaunch::new` are different on each os.
+//! The parameters of `AutoLaunch::new` are different on each platform.
 //! See the function definition or the demo below for details.
 //!
 //!
@@ -96,12 +96,52 @@ mod macos;
 mod windows;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct AutoLaunch<'a> {
+/// The parameters of `AutoLaunch::new` are different on each platform.
+///
+/// ### Linux
+///
+/// ```rust
+/// # #[cfg(target_os = "linux")]
+/// # {
+/// # use auto_launch::AutoLaunch;
+/// # let app_name = "the-app";
+/// # let app_path = "/path/to/the-app";
+/// # let hidden = false;
+/// AutoLaunch::new(app_name, app_path, hidden);
+/// # }
+/// ```
+///
+/// ### Macos
+///
+/// ```rust
+/// # #[cfg(target_os = "macos")]
+/// # {
+/// # use auto_launch::AutoLaunch;
+/// # let app_name = "the-app";
+/// # let app_path = "/path/to/the-app";
+/// # let use_launch_agent = false;
+/// # let hidden = false;
+/// AutoLaunch::new(app_name, app_path, use_launch_agent, hidden);
+/// # }
+/// ```
+///
+/// ### Windows
+///
+/// ```rust
+/// # #[cfg(target_os = "windows")]
+/// # {
+/// # use auto_launch::AutoLaunch;
+/// # let app_name = "the-app";
+/// # let app_path = "/path/to/the-app";
+/// AutoLaunch::new(app_name, app_path);
+/// # }
+/// ```
+pub struct AutoLaunch {
     /// The application name
-    pub(crate) app_name: &'a str,
+    pub(crate) app_name: String,
 
     /// The application executable path (absolute path will be better)
-    pub(crate) app_path: &'a str,
+    pub(crate) app_path: String,
 
     #[cfg(target_os = "macos")]
     /// Whether use Launch Agent for implement or use AppleScript
@@ -112,15 +152,15 @@ pub struct AutoLaunch<'a> {
     pub(crate) hidden: bool,
 }
 
-impl AutoLaunch<'_> {
+impl AutoLaunch {
     /// get the application name
     pub fn get_app_name(&self) -> &str {
-        self.app_name
+        &self.app_name
     }
 
     /// get the application path
     pub fn get_app_path(&self) -> &str {
-        self.app_path
+        &self.app_path
     }
 
     #[cfg(not(target_os = "windows"))]
