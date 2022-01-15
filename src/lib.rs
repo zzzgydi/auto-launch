@@ -96,7 +96,7 @@
 //! ```rust
 //! use auto_launch::*;
 //!
-//! fn main() -> std::io::Result<()> {
+//! fn main() {
 //!     let auto = AutoLaunchBuilder::new()
 //!         .set_app_name("the-app")
 //!         .set_app_path("/path/to/the-app")
@@ -104,13 +104,11 @@
 //!         .set_hidden(true)
 //!         .build();
 //!     
-//!     auto.enable()?;
-//!     auto.is_enabled()?;
+//!     auto.enable().is_ok();
+//!     auto.is_enabled().unwrap();
 //!     
-//!     auto.disable()?;
-//!     auto.is_enabled()?;
-//!
-//!     Ok(())
+//!     auto.disable().is_ok();
+//!     auto.is_enabled().unwrap();
 //! }
 //! ```
 //!
@@ -227,7 +225,7 @@ impl AutoLaunch {
 /// ```rust
 /// use auto_launch::*;
 ///
-/// fn main() -> std::io::Result<()> {
+/// fn main() {
 ///     let auto = AutoLaunchBuilder::new()
 ///         .set_app_name("the-app")
 ///         .set_app_path("/path/to/the-app")
@@ -235,13 +233,11 @@ impl AutoLaunch {
 ///         .set_hidden(true)
 ///         .build();
 ///     
-///     auto.enable()?;
-///     auto.is_enabled()?;
+///     auto.enable().is_ok();
+///     auto.is_enabled().unwrap();
 ///     
-///     auto.disable()?;
-///     auto.is_enabled()?;
-///
-///     Ok(())
+///     auto.disable().is_ok();
+///     auto.is_enabled().unwrap();
 /// }
 /// ```
 pub struct AutoLaunchBuilder {

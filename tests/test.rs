@@ -3,12 +3,12 @@ mod union_tests {
     use auto_launch::{AutoLaunch, AutoLaunchBuilder};
     use std::env::current_dir;
 
-    fn get_test_bin() -> String {
-        let test_bin = if cfg!(target_os = "windows") {
-            "auto-launch-test.exe"
-        } else {
-            "auto-launch-test"
+    fn get_test_bin(name: &str) -> String {
+        let ext = match cfg!(target_os = "windows") {
+            true => ".exe",
+            false => "",
         };
+        let test_bin = String::from(name) + ext;
         let test_bin = current_dir()
             .unwrap()
             .join("test-exe/target/release")
@@ -29,7 +29,7 @@ mod union_tests {
     fn test_macos_new() {
         let name_1 = "AutoLaunchTest"; // different name
         let name_2 = "auto-launch-test"; // same name
-        let app_path = get_test_bin();
+        let app_path = get_test_bin("auto-launch-test");
         let app_path = app_path.as_str();
 
         // applescript
@@ -51,7 +51,7 @@ mod union_tests {
     #[test]
     fn test_macos_main() {
         let app_name = "auto-launch-test";
-        let app_path = get_test_bin();
+        let app_path = get_test_bin("auto-launch-test");
         let app_path = app_path.as_str();
 
         // path not exists
@@ -85,13 +85,42 @@ mod union_tests {
         assert!(!auto2.is_enabled().unwrap());
         assert!(auto2.disable().is_ok());
         assert!(!auto2.is_enabled().unwrap());
+
+        // test builder
+        let auto = AutoLaunchBuilder::new()
+            .set_app_name(app_name)
+            .set_app_path(app_path)
+            .set_hidden(true)
+            .build();
+
+        assert_eq!(auto.get_app_name(), app_name);
+        assert!(auto.is_hidden());
+        assert!(auto.enable().is_ok());
+        assert!(auto.is_enabled().unwrap());
+        assert!(auto.disable().is_ok());
+        assert!(!auto.is_enabled().unwrap());
+
+        // use launch agent
+        let auto = AutoLaunchBuilder::new()
+            .set_app_name(app_name)
+            .set_app_path(app_path)
+            .set_use_launch_agent(true)
+            .set_hidden(true)
+            .build();
+
+        assert_eq!(auto.get_app_name(), app_name);
+        assert!(auto.is_hidden());
+        assert!(auto.enable().is_ok());
+        assert!(auto.is_enabled().unwrap());
+        assert!(auto.disable().is_ok());
+        assert!(!auto.is_enabled().unwrap());
     }
 
     #[cfg(target_os = "linux")]
     #[test]
     fn test_linux() {
         let app_name = "AutoLaunchTest";
-        let app_path = get_test_bin();
+        let app_path = get_test_bin("auto-launch-test");
         let app_path = app_path.as_str();
 
         // default test
@@ -117,7 +146,7 @@ mod union_tests {
     #[test]
     fn test_windows() {
         let app_name = "AutoLaunchTest";
-        let app_path = get_test_bin();
+        let app_path = get_test_bin("auto-launch-test");
         let app_path = app_path.as_str();
 
         let auto = AutoLaunch::new(app_name, app_path);
@@ -129,10 +158,12 @@ mod union_tests {
         assert!(!auto.is_enabled().unwrap());
     }
 
+    // There will be conflicts with other test cases on macos
+    #[cfg(not(target_os = "macos"))]
     #[test]
     fn test_builder() {
         let app_name = "auto-launch-test";
-        let app_path = get_test_bin();
+        let app_path = get_test_bin("auto-launch-test");
         let app_path = app_path.as_str();
 
         let auto = AutoLaunchBuilder::new()
