@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod union_tests {
-    use auto_launch::AutoLaunch;
+    use auto_launch::{AutoLaunch, AutoLaunchBuilder};
     use std::env::current_dir;
 
     fn get_test_bin() -> String {
@@ -17,6 +17,11 @@ mod union_tests {
         // if not exists, check the test exe
         assert!(test_bin.exists());
         test_bin.as_os_str().to_string_lossy().into_owned()
+    }
+
+    #[test]
+    fn test_support() {
+        assert!(AutoLaunch::is_support());
     }
 
     #[cfg(target_os = "macos")]
@@ -116,6 +121,28 @@ mod union_tests {
         let app_path = app_path.as_str();
 
         let auto = AutoLaunch::new(app_name, app_path);
+
+        assert_eq!(auto.get_app_name(), app_name);
+        assert!(auto.enable().is_ok());
+        assert!(auto.is_enabled().unwrap());
+        assert!(auto.disable().is_ok());
+        assert!(!auto.is_enabled().unwrap());
+    }
+
+    #[test]
+    fn test_builder() {
+        let app_name = "auto-launch-test";
+        let app_path = get_test_bin();
+        let app_path = app_path.as_str();
+
+        let auto = AutoLaunchBuilder::new()
+            .set_app_name(app_name)
+            .set_app_path(app_path)
+            .set_hidden(true)
+            .build();
+
+        #[cfg(not(target_os = "windows"))]
+        assert!(auto.is_hidden());
 
         assert_eq!(auto.get_app_name(), app_name);
         assert!(auto.enable().is_ok());
