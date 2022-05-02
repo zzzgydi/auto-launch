@@ -14,10 +14,11 @@ impl AutoLaunch {
     /// ## Notes
     ///
     /// The parameters of `AutoLaunch::new` are different on each platform.
-    pub fn new(app_name: &str, app_path: &str) -> AutoLaunch {
+    pub fn new(app_name: &str, app_path: &str, args: &[impl AsRef<str>]) -> AutoLaunch {
         AutoLaunch {
             app_name: app_name.into(),
             app_path: app_path.into(),
+            args: args.iter().map(|s| s.as_ref().to_string()).collect(),
         }
     }
 
@@ -30,7 +31,10 @@ impl AutoLaunch {
     pub fn enable(&self) -> Result<()> {
         let hkcu = RegKey::predef(HKEY_CURRENT_USER);
         hkcu.open_subkey_with_flags(AL_REGKEY, KEY_SET_VALUE)?
-            .set_value::<_, _>(&self.app_name, &self.app_path)
+            .set_value::<_, _>(
+                &self.app_name,
+                &format!("{} {}", &self.app_path, &self.args.join(" ")),
+            )
     }
 
     /// Disable the AutoLaunch setting

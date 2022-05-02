@@ -7,10 +7,6 @@
 //!
 //! Or you can construct the AutoLaunch by using `AutoLaunchBuilder`.
 //!
-//! ### Linux
-//!
-//! On Linux, it supports `hidden` parameter which means that hidden the app on launch.
-//!
 //! ```rust
 //! # #[cfg(target_os = "linux")]
 //! # mod linux {
@@ -19,7 +15,8 @@
 //! fn main() {
 //!     let app_name = "the-app";
 //!     let app_path = "/path/to/the-app";
-//!     let auto = AutoLaunch::new(app_name, app_path, false);
+//!     let args = &["--minimized"];
+//!     let auto = AutoLaunch::new(app_name, app_path, args);
 //!
 //!     // enable the auto launch
 //!     auto.enable().is_ok();
@@ -50,8 +47,9 @@
 //! fn main() {
 //!     let app_name = "the-app";
 //!     let app_path = "/path/to/the-app.app";
-//!     let auto = AutoLaunch::new(app_name, app_path, false, false);
-//!     
+//!     let args = &["--minimized"];
+//!     let auto = AutoLaunch::new(app_name, app_path, false, args);
+//!
 //!     // enable the auto launch
 //!     auto.enable().is_ok();
 //!     auto.is_enabled().unwrap();
@@ -75,6 +73,7 @@
 //! fn main() {
 //!     let app_name = "the-app";
 //!     let app_path = "C:\\path\\to\\the-app.exe";
+//!     let args = &["--minimized"];
 //!     let auto = AutoLaunch::new(app_name, app_path);
 //!
 //!     // enable the auto launch
@@ -101,12 +100,12 @@
 //!         .set_app_name("the-app")
 //!         .set_app_path("/path/to/the-app")
 //!         .set_use_launch_agent(true)
-//!         .set_hidden(true)
+//!         .set_args(&["--minimized"])
 //!         .build();
-//!     
+//!
 //!     auto.enable().is_ok();
 //!     auto.is_enabled().unwrap();
-//!     
+//!
 //!     auto.disable().is_ok();
 //!     auto.is_enabled().unwrap();
 //! }
@@ -130,8 +129,8 @@ mod windows;
 /// # use auto_launch::AutoLaunch;
 /// # let app_name = "the-app";
 /// # let app_path = "/path/to/the-app";
-/// # let hidden = false;
-/// AutoLaunch::new(app_name, app_path, hidden);
+/// # let args = &["--minimized"];
+/// AutoLaunch::new(app_name, app_path, args);
 /// # }
 /// ```
 ///
@@ -144,8 +143,8 @@ mod windows;
 /// # let app_name = "the-app";
 /// # let app_path = "/path/to/the-app";
 /// # let use_launch_agent = false;
-/// # let hidden = false;
-/// AutoLaunch::new(app_name, app_path, use_launch_agent, hidden);
+/// # let args = &["--minimized"];
+/// AutoLaunch::new(app_name, app_path, use_launch_agent, args);
 /// # }
 /// ```
 ///
@@ -157,7 +156,8 @@ mod windows;
 /// # use auto_launch::AutoLaunch;
 /// # let app_name = "the-app";
 /// # let app_path = "/path/to/the-app";
-/// AutoLaunch::new(app_name, app_path);
+/// # let args = &["--minimized"];
+/// AutoLaunch::new(app_name, app_path, args);
 /// # }
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -172,9 +172,8 @@ pub struct AutoLaunch {
     /// Whether use Launch Agent for implement or use AppleScript
     pub(crate) use_launch_agent: bool,
 
-    #[cfg(not(target_os = "windows"))]
-    /// Supports hidden the application on launch
-    pub(crate) hidden: bool,
+    /// Args passed to the binary on startup
+    pub(crate) args: Vec<String>,
 }
 
 impl AutoLaunch {
@@ -205,10 +204,9 @@ impl AutoLaunch {
         &self.app_path
     }
 
-    #[cfg(not(target_os = "windows"))]
     /// get whether it is hidden
-    pub fn is_hidden(&self) -> bool {
-        self.hidden
+    pub fn get_args(&self) -> &[String] {
+        &self.args
     }
 }
 
@@ -230,12 +228,12 @@ impl AutoLaunch {
 ///         .set_app_name("the-app")
 ///         .set_app_path("/path/to/the-app")
 ///         .set_use_launch_agent(true)
-///         .set_hidden(true)
+///         .set_args(&["--minimized"])
 ///         .build();
-///     
+///
 ///     auto.enable().is_ok();
 ///     auto.is_enabled().unwrap();
-///     
+///
 ///     auto.disable().is_ok();
 ///     auto.is_enabled().unwrap();
 /// }
@@ -247,7 +245,7 @@ pub struct AutoLaunchBuilder {
 
     pub use_launch_agent: bool,
 
-    pub hidden: bool,
+    pub args: Option<Vec<String>>,
 }
 
 impl AutoLaunchBuilder {
@@ -274,8 +272,8 @@ impl AutoLaunchBuilder {
     }
 
     /// Set the `hidden`
-    pub fn set_hidden(&mut self, hidden: bool) -> &mut Self {
-        self.hidden = hidden;
+    pub fn set_args(&mut self, args: &[impl AsRef<str>]) -> &mut Self {
+        self.args = Some(args.iter().map(|s| s.as_ref().to_string()).collect());
         self
     }
 
@@ -296,12 +294,13 @@ impl AutoLaunchBuilder {
 
         let app_name = self.app_name.clone().unwrap();
         let app_path = self.app_path.clone().unwrap();
+        let args = self.args.clone().unwrap_or_default();
 
         #[cfg(target_os = "linux")]
-        return AutoLaunch::new(&app_name, &app_path, self.hidden);
+        return AutoLaunch::new(&app_name, &app_path, &args);
         #[cfg(target_os = "macos")]
-        return AutoLaunch::new(&app_name, &app_path, self.use_launch_agent, self.hidden);
+        return AutoLaunch::new(&app_name, &app_path, self.use_launch_agent, &args);
         #[cfg(target_os = "windows")]
-        return AutoLaunch::new(&app_name, &app_path);
+        return AutoLaunch::new(&app_name, &app_path, &args);
     }
 }
