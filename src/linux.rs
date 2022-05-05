@@ -8,16 +8,16 @@ impl AutoLaunch {
     /// Create a new AutoLaunch instance
     /// - `app_name`: application name
     /// - `app_path`: application path
-    /// - `hidden`: whether hidden the application on launch or not.
+    /// - `args`: startup args passed to the binary.
     ///
     /// ## Notes
     ///
     /// The parameters of `AutoLaunch::new` are different on each platform.
-    pub fn new(app_name: &str, app_path: &str, hidden: bool) -> AutoLaunch {
+    pub fn new(app_name: &str, app_path: &str, args: &[impl AsRef<str>]) -> AutoLaunch {
         AutoLaunch {
             app_name: app_name.into(),
             app_path: app_path.into(),
-            hidden,
+            args: args.iter().map(|s| s.as_ref().to_string()).collect(),
         }
     }
 
@@ -29,17 +29,19 @@ impl AutoLaunch {
     /// - failed to create file `~/.config/autostart/{app_name}.desktop`
     /// - failed to write bytes to the file
     pub fn enable(&self) -> Result<()> {
-        let hidden = if self.hidden { " --hidden" } else { "" };
         let data = format!(
             "[Desktop Entry]\n\
             Type=Application\n\
             Version=1.0\n\
             Name={}\n\
             Comment={}startup script\n\
-            Exec={}{}\n\
+            Exec={} {}\n\
             StartupNotify=false\n\
             Terminal=false",
-            self.app_name, self.app_name, self.app_path, hidden
+            self.app_name,
+            self.app_name,
+            self.app_path,
+            self.args.join(" ")
         );
 
         let dir = get_dir();

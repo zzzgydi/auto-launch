@@ -21,7 +21,12 @@ impl AutoLaunch {
     ///
     /// The `app_path` should be the **absolute path** and **exists**,
     ///     otherwise it will cause an error when `enable`.
-    pub fn new(app_name: &str, app_path: &str, use_launch_agent: bool, hidden: bool) -> AutoLaunch {
+    pub fn new(
+        app_name: &str,
+        app_path: &str,
+        use_launch_agent: bool,
+        args: &[impl AsRef<str>],
+    ) -> AutoLaunch {
         let mut name = app_name;
         if !use_launch_agent {
             // the app_name should be same as the executable's name
@@ -39,7 +44,7 @@ impl AutoLaunch {
             app_name: name.into(),
             app_path: app_path.into(),
             use_launch_agent,
-            hidden,
+            args: args.iter().map(|s| s.as_ref().to_string()).collect(),
         }
     }
 
@@ -71,11 +76,8 @@ impl AutoLaunch {
                 fs::create_dir(&dir)?;
             }
 
-            let mut args = vec![self.app_path.as_str()];
-
-            if self.hidden {
-                args.push("--hidden");
-            }
+            let mut args = vec![self.app_path.clone()];
+            args.extend_from_slice(&self.args);
 
             let section = args
                 .iter()

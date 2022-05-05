@@ -29,15 +29,17 @@ mod union_tests {
     fn test_macos_new() {
         let name_1 = "AutoLaunchTest"; // different name
         let name_2 = "auto-launch-test"; // same name
+
+        let args = &["--minimized"];
         let app_path = get_test_bin("auto-launch-test");
         let app_path = app_path.as_str();
 
         // applescript
-        let auto1 = AutoLaunch::new(name_1, app_path, false, false);
-        let auto2 = AutoLaunch::new(name_2, app_path, false, false);
+        let auto1 = AutoLaunch::new(name_1, app_path, false, args);
+        let auto2 = AutoLaunch::new(name_2, app_path, false, args);
         // launch agent
-        let auto3 = AutoLaunch::new(name_1, app_path, true, false);
-        let auto4 = AutoLaunch::new(name_2, app_path, true, false);
+        let auto3 = AutoLaunch::new(name_1, app_path, true, args);
+        let auto4 = AutoLaunch::new(name_2, app_path, true, args);
 
         // app_name will be revised
         assert_eq!(auto1.get_app_name(), name_2);
@@ -52,6 +54,7 @@ mod union_tests {
     fn test_macos_main() {
         let app_name = "auto-launch-test";
         let app_path = get_test_bin("auto-launch-test");
+        let args = &["--minimized"];
         let app_path = app_path.as_str();
 
         // path not exists
@@ -59,27 +62,27 @@ mod union_tests {
         let app_path_not = "/Applications/Calculator1.app";
 
         // use applescript
-        let auto1 = AutoLaunch::new(app_name, app_path, false, false);
+        let auto1 = AutoLaunch::new(app_name, app_path, false, args);
         assert_eq!(auto1.get_app_name(), app_name);
         assert!(auto1.enable().is_ok());
         assert!(auto1.is_enabled().unwrap());
         assert!(auto1.disable().is_ok());
         assert!(!auto1.is_enabled().unwrap());
 
-        let auto2 = AutoLaunch::new(app_name_not, app_path_not, false, false);
+        let auto2 = AutoLaunch::new(app_name_not, app_path_not, false, args);
         assert_eq!(auto2.get_app_name(), app_name_not);
         assert!(auto2.enable().is_err());
         assert!(!auto2.is_enabled().unwrap());
 
         // use launch agent
-        let auto1 = AutoLaunch::new(app_name, app_path, true, false);
+        let auto1 = AutoLaunch::new(app_name, app_path, true, args);
         assert_eq!(auto1.get_app_name(), app_name);
         assert!(auto1.enable().is_ok());
         assert!(auto1.is_enabled().unwrap());
         assert!(auto1.disable().is_ok());
         assert!(!auto1.is_enabled().unwrap());
 
-        let auto2 = AutoLaunch::new(app_name, app_path_not, true, false);
+        let auto2 = AutoLaunch::new(app_name, app_path_not, true, args);
         assert_eq!(auto2.get_app_name(), app_name); // will not change the name
         assert!(auto2.enable().is_err());
         assert!(!auto2.is_enabled().unwrap());
@@ -90,7 +93,7 @@ mod union_tests {
         let auto = AutoLaunchBuilder::new()
             .set_app_name(app_name)
             .set_app_path(app_path)
-            .set_hidden(true)
+            .set_args(args)
             .build();
 
         assert_eq!(auto.get_app_name(), app_name);
@@ -105,7 +108,7 @@ mod union_tests {
             .set_app_name(app_name)
             .set_app_path(app_path)
             .set_use_launch_agent(true)
-            .set_hidden(true)
+            .set_args(args)
             .build();
 
         assert_eq!(auto.get_app_name(), app_name);
@@ -121,10 +124,11 @@ mod union_tests {
     fn test_linux() {
         let app_name = "AutoLaunchTest";
         let app_path = get_test_bin("auto-launch-test");
+        let args = &["--minimized"];
         let app_path = app_path.as_str();
 
         // default test
-        let auto1 = AutoLaunch::new(app_name, app_path, false);
+        let auto1 = AutoLaunch::new(app_name, app_path, args);
 
         assert_eq!(auto1.get_app_name(), app_name);
         assert!(auto1.enable().is_ok());
@@ -132,8 +136,8 @@ mod union_tests {
         assert!(auto1.disable().is_ok());
         assert!(!auto1.is_enabled().unwrap());
 
-        // test hidden
-        let auto2 = AutoLaunch::new(app_name, app_path, true);
+        // test args
+        let auto2 = AutoLaunch::new(app_name, app_path, args);
 
         assert_eq!(auto2.get_app_name(), app_name);
         assert!(auto2.enable().is_ok());
@@ -147,9 +151,10 @@ mod union_tests {
     fn test_windows() {
         let app_name = "AutoLaunchTest";
         let app_path = get_test_bin("auto-launch-test");
+        let args = &["--minimized"];
         let app_path = app_path.as_str();
 
-        let auto = AutoLaunch::new(app_name, app_path);
+        let auto = AutoLaunch::new(app_name, app_path, args);
 
         assert_eq!(auto.get_app_name(), app_name);
         assert!(auto.enable().is_ok());
@@ -164,12 +169,13 @@ mod union_tests {
     fn test_builder() {
         let app_name = "auto-launch-test";
         let app_path = get_test_bin("auto-launch-test");
+        let args = &["--minimized"];
         let app_path = app_path.as_str();
 
         let auto = AutoLaunchBuilder::new()
             .set_app_name(app_name)
             .set_app_path(app_path)
-            .set_hidden(true)
+            .set_args(args)
             .build();
 
         #[cfg(not(target_os = "windows"))]
