@@ -97,7 +97,6 @@ mod union_tests {
             .build();
 
         assert_eq!(auto.get_app_name(), app_name);
-        assert!(auto.is_hidden());
         assert!(auto.enable().is_ok());
         assert!(auto.is_enabled().unwrap());
         assert!(auto.disable().is_ok());
@@ -112,7 +111,6 @@ mod union_tests {
             .build();
 
         assert_eq!(auto.get_app_name(), app_name);
-        assert!(auto.is_hidden());
         assert!(auto.enable().is_ok());
         assert!(auto.is_enabled().unwrap());
         assert!(auto.disable().is_ok());
@@ -177,9 +175,6 @@ mod union_tests {
             .set_app_path(app_path)
             .set_args(args)
             .build();
-
-        #[cfg(not(target_os = "windows"))]
-        assert!(auto.is_hidden());
 
         assert_eq!(auto.get_app_name(), app_name);
         assert!(auto.enable().is_ok());
