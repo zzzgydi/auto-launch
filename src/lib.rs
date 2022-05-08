@@ -74,7 +74,7 @@
 //!     let app_name = "the-app";
 //!     let app_path = "C:\\path\\to\\the-app.exe";
 //!     let args = &["--minimized"];
-//!     let auto = AutoLaunch::new(app_name, app_path);
+//!     let auto = AutoLaunch::new(app_name, app_path, args);
 //!
 //!     // enable the auto launch
 //!     auto.enable().is_ok();
