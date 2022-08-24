@@ -29,15 +29,14 @@
 //! # }
 //! ```
 //!
-//! ### Macos
+//! ### macOS
 //!
-//! Macos supports two ways to achieve auto launch (via AppleScript or Launch Agent).
+//! macOS supports two ways to achieve auto launch (via AppleScript or Launch Agent).
 //! When the `use_launch_agent` is true, it will achieve by Launch Agent, otherwise by AppleScript.
-//! On Macos, it supports `hidden` parameter which means that hidden the app on launch.
 //!
 //! **Note**:
 //! - The `app_path` should be a absolute path and exists. Otherwise, it will cause an error when `enable`.
-//! - In case using AppleScript, the `app_name` should be same as the basename of `app_path`, or it will be corrected In case of AppleScript, the `app_name` should be same as the basename of `app_path`, or it will be corrected automatically.
+//! - In case using AppleScript, the `app_name` should be same as the basename of `app_path`, or it will be corrected automatically.
 //!
 //! ```rust
 //! # #[cfg(target_os = "macos")]
@@ -205,7 +204,7 @@ impl AutoLaunch {
         &self.app_path
     }
 
-    /// get whether it is hidden
+    /// get the args
     pub fn get_args(&self) -> &[String] {
         &self.args
     }
@@ -274,7 +273,7 @@ impl AutoLaunchBuilder {
         self
     }
 
-    /// Set the `hidden`
+    /// Set the args
     pub fn set_args(&mut self, args: &[impl AsRef<str>]) -> &mut Self {
         self.args = Some(args.iter().map(|s| s.as_ref().to_string()).collect());
         self

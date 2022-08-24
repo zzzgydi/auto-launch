@@ -1,11 +1,11 @@
 use crate::AutoLaunch;
-use anyhow::{bail, Context, Result};
+use anyhow::{bail, Result};
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
-/// Macos implement
+/// macOS implement
 impl AutoLaunch {
     /// Create a new AutoLaunch instance
     /// - `app_name`: application name
