@@ -1,5 +1,5 @@
 #[cfg(test)]
-mod union_tests {
+mod unit_test {
     use auto_launch::{AutoLaunch, AutoLaunchBuilder};
     use std::env::current_dir;
 
@@ -30,7 +30,7 @@ mod union_tests {
         let name_1 = "AutoLaunchTest"; // different name
         let name_2 = "auto-launch-test"; // same name
 
-        let args = &["--minimized"];
+        let args = &["--minimized", "--hidden"];
         let app_path = get_test_bin("auto-launch-test");
         let app_path = app_path.as_str();
 
@@ -54,7 +54,7 @@ mod union_tests {
     fn test_macos_main() {
         let app_name = "auto-launch-test";
         let app_path = get_test_bin("auto-launch-test");
-        let args = &["--minimized"];
+        let args = &["--minimized", "--hidden"];
         let app_path = app_path.as_str();
 
         // path not exists
@@ -94,7 +94,8 @@ mod union_tests {
             .set_app_name(app_name)
             .set_app_path(app_path)
             .set_args(args)
-            .build();
+            .build()
+            .unwrap();
 
         assert_eq!(auto.get_app_name(), app_name);
         assert!(auto.enable().is_ok());
@@ -108,7 +109,8 @@ mod union_tests {
             .set_app_path(app_path)
             .set_use_launch_agent(true)
             .set_args(args)
-            .build();
+            .build()
+            .unwrap();
 
         assert_eq!(auto.get_app_name(), app_name);
         assert!(auto.enable().is_ok());
@@ -174,7 +176,8 @@ mod union_tests {
             .set_app_name(app_name)
             .set_app_path(app_path)
             .set_args(args)
-            .build();
+            .build()
+            .unwrap();
 
         assert_eq!(auto.get_app_name(), app_name);
         assert!(auto.enable().is_ok());

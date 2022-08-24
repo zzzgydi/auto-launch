@@ -1,5 +1,5 @@
 use crate::AutoLaunch;
-use std::io::Result;
+use anyhow::Result;
 use winreg::enums::{HKEY_CURRENT_USER, KEY_READ, KEY_SET_VALUE};
 use winreg::RegKey;
 
@@ -10,6 +10,7 @@ impl AutoLaunch {
     /// Create a new AutoLaunch instance
     /// - `app_name`: application name
     /// - `app_path`: application path
+    /// - `args`: startup args passed to the binary
     ///
     /// ## Notes
     ///
@@ -34,7 +35,8 @@ impl AutoLaunch {
             .set_value::<_, _>(
                 &self.app_name,
                 &format!("{} {}", &self.app_path, &self.args.join(" ")),
-            )
+            )?;
+        Ok(())
     }
 
     /// Disable the AutoLaunch setting
@@ -46,7 +48,8 @@ impl AutoLaunch {
     pub fn disable(&self) -> Result<()> {
         let hkcu = RegKey::predef(HKEY_CURRENT_USER);
         hkcu.open_subkey_with_flags(AL_REGKEY, KEY_SET_VALUE)?
-            .delete_value(&self.app_name)
+            .delete_value(&self.app_name)?;
+        Ok(())
     }
 
     /// Check whether the AutoLaunch setting is enabled

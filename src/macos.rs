@@ -1,16 +1,17 @@
 use crate::AutoLaunch;
+use anyhow::{bail, Context, Result};
 use std::fs;
-use std::io::{Error, ErrorKind, Result, Write};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
-/// Macos implment
+/// Macos implement
 impl AutoLaunch {
     /// Create a new AutoLaunch instance
     /// - `app_name`: application name
     /// - `app_path`: application path
-    /// - `use_launch_agent`: whether use Launch Agent or AppleScript.
-    /// - `hidden`: whether hidden the application on launch or not.
+    /// - `use_launch_agent`: whether use Launch Agent or AppleScript
+    /// - `args`: startup args passed to the binary
     ///
     /// ## Notes
     ///
@@ -21,6 +22,9 @@ impl AutoLaunch {
     ///
     /// The `app_path` should be the **absolute path** and **exists**,
     ///     otherwise it will cause an error when `enable`.
+    ///
+    /// In case using AppleScript (`use_launch_agent=false`),
+    ///     only `"--hidden"` and `"--minimized"` in `args` are valid.
     pub fn new(
         app_name: &str,
         app_path: &str,
@@ -66,8 +70,13 @@ impl AutoLaunch {
     /// - failed to execute the `osascript` command, check the exit status or stderr for details
     pub fn enable(&self) -> Result<()> {
         let path = Path::new(&self.app_path);
-        if !path.exists() || !path.is_absolute() {
-            return Err(Error::from(ErrorKind::InvalidInput));
+
+        if !path.exists() {
+            bail!("app path does not exist");
+        }
+
+        if !path.is_absolute() {
+            bail!("app path is not absolute path");
         }
 
         if self.use_launch_agent {
@@ -102,20 +111,28 @@ impl AutoLaunch {
                 section
             );
             fs::File::create(self.get_file())?.write(data.as_bytes())?;
-            Ok(())
         } else {
+            let hidden = self
+                .args
+                .iter()
+                .find(|arg| *arg == "--hidden" || *arg == "--minimized");
+
             let props = format!(
                 "{{name:\"{}\",path:\"{}\",hidden:{}}}",
-                self.app_name, self.app_path, self.hidden
+                self.app_name,
+                self.app_path,
+                hidden.is_some()
             );
             let command = format!("make login item at end with properties {}", props);
             let output = exec_apple_script(&command)?;
-            if output.status.success() {
-                Ok(())
-            } else {
-                Err(Error::from_raw_os_error(output.status.code().unwrap_or(1)))
+            if !output.status.success() {
+                bail!(
+                    "failed to execute apple script with status {}",
+                    output.status.code().unwrap_or(1)
+                );
             }
         }
+        Ok(())
     }
 
     /// Disable the AutoLaunch setting
@@ -133,19 +150,19 @@ impl AutoLaunch {
         if self.use_launch_agent {
             let file = self.get_file();
             if file.exists() {
-                fs::remove_file(file)
-            } else {
-                Ok(())
+                fs::remove_file(file)?;
             }
         } else {
             let command = format!("delete login item \"{}\"", self.app_name);
             let output = exec_apple_script(&command)?;
-            if output.status.success() {
-                Ok(())
-            } else {
-                Err(Error::from_raw_os_error(output.status.code().unwrap_or(1)))
+            if !output.status.success() {
+                bail!(
+                    "failed to execute apple script with status {}",
+                    output.status.code().unwrap_or(1)
+                );
             }
         }
+        Ok(())
     }
 
     /// Check whether the AutoLaunch setting is enabled
@@ -182,7 +199,8 @@ fn get_dir() -> PathBuf {
 /// Execute the specific AppleScript
 fn exec_apple_script(cmd_suffix: &str) -> Result<Output> {
     let command = format!("tell application \"System Events\" to {}", cmd_suffix);
-    Command::new("osascript")
+    let output = Command::new("osascript")
         .args(vec!["-e", &command])
-        .output()
+        .output()?;
+    Ok(output)
 }

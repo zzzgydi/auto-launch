@@ -1,6 +1,7 @@
 use crate::AutoLaunch;
+use anyhow::Result;
 use std::fs;
-use std::io::{Result, Write};
+use std::io::Write;
 use std::path::PathBuf;
 
 /// Linux implement
@@ -8,7 +9,7 @@ impl AutoLaunch {
     /// Create a new AutoLaunch instance
     /// - `app_name`: application name
     /// - `app_path`: application path
-    /// - `args`: startup args passed to the binary.
+    /// - `args`: startup args passed to the binary
     ///
     /// ## Notes
     ///
@@ -60,10 +61,9 @@ impl AutoLaunch {
     pub fn disable(&self) -> Result<()> {
         let file = self.get_file();
         if file.exists() {
-            fs::remove_file(file)
-        } else {
-            Ok(())
+            fs::remove_file(file)?;
         }
+        Ok(())
     }
 
     /// Check whether the AutoLaunch setting is enabled

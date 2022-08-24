@@ -37,7 +37,7 @@
 //!
 //! **Note**:
 //! - The `app_path` should be a absolute path and exists. Otherwise, it will cause an error when `enable`.
-//! - When in the AppleScript way, the `app_name` should be same as the basename of `app_path`, or it will be corrected automately.
+//! - In case using AppleScript, the `app_name` should be same as the basename of `app_path`, or it will be corrected In case of AppleScript, the `app_name` should be same as the basename of `app_path`, or it will be corrected automatically.
 //!
 //! ```rust
 //! # #[cfg(target_os = "macos")]
@@ -101,7 +101,8 @@
 //!         .set_app_path("/path/to/the-app")
 //!         .set_use_launch_agent(true)
 //!         .set_args(&["--minimized"])
-//!         .build();
+//!         .build()
+//!         .unwrap();
 //!
 //!     auto.enable().is_ok();
 //!     auto.is_enabled().unwrap();
@@ -229,7 +230,8 @@ impl AutoLaunch {
 ///         .set_app_path("/path/to/the-app")
 ///         .set_use_launch_agent(true)
 ///         .set_args(&["--minimized"])
-///         .build();
+///         .build()
+///         .unwrap();
 ///
 ///     auto.enable().is_ok();
 ///     auto.is_enabled().unwrap();
@@ -266,6 +268,7 @@ impl AutoLaunchBuilder {
     }
 
     /// Set the `use_launch_agent`
+    /// This setting only works on macOS
     pub fn set_use_launch_agent(&mut self, use_launch_agent: bool) -> &mut Self {
         self.use_launch_agent = use_launch_agent;
         self
@@ -279,17 +282,21 @@ impl AutoLaunchBuilder {
 
     /// Construct a AutoLaunch instance
     ///
+    /// ## Errors
+    ///
+    /// - `app_name` is none
+    /// - `app_path` is none
+    ///
     /// ## Panics
     ///
-    /// - `app_name` is None
-    /// - `app_path` is None
-    pub fn build(&self) -> AutoLaunch {
+    /// - Unsupported target OS
+    pub fn build(&self) -> anyhow::Result<AutoLaunch> {
         if self.app_name.is_none() {
-            panic!("The `app_name` should not be None.");
+            anyhow::bail!("The `app_name` should not be none.");
         }
 
         if self.app_path.is_none() {
-            panic!("The `app_path` should not be None.");
+            anyhow::bail!("The `app_path` should not be none.");
         }
 
         let app_name = self.app_name.clone().unwrap();
@@ -297,10 +304,18 @@ impl AutoLaunchBuilder {
         let args = self.args.clone().unwrap_or_default();
 
         #[cfg(target_os = "linux")]
-        return AutoLaunch::new(&app_name, &app_path, &args);
+        return Ok(AutoLaunch::new(&app_name, &app_path, &args));
         #[cfg(target_os = "macos")]
-        return AutoLaunch::new(&app_name, &app_path, self.use_launch_agent, &args);
+        return Ok(AutoLaunch::new(
+            &app_name,
+            &app_path,
+            self.use_launch_agent,
+            &args,
+        ));
         #[cfg(target_os = "windows")]
-        return AutoLaunch::new(&app_name, &app_path, &args);
+        return Ok(AutoLaunch::new(&app_name, &app_path, &args));
+
+        #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
+        panic!("unsupported target os");
     }
 }
