@@ -112,6 +112,24 @@
 //! ```
 //!
 
+#[derive(thiserror::Error, Debug)]
+pub enum Error {
+    #[error("app_name shouldn't be None")]
+    AppNameNotSpecified,
+    #[error("app_path shouldn't be None")]
+    AppPathNotSpecified,
+    #[error("app path doesn't exist: {0}")]
+    AppPathDoesntExist(std::path::PathBuf),
+    #[error("app path is not absolute: {0}")]
+    AppPathIsNotAbsolute(std::path::PathBuf),
+    #[error("Unsupported target os")]
+    UnsupportedOS,
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
+}
+
+pub type Result<T> = std::result::Result<T, Error>;
+
 #[cfg(target_os = "linux")]
 mod linux;
 #[cfg(target_os = "macos")]
@@ -289,17 +307,9 @@ impl AutoLaunchBuilder {
     /// ## Panics
     ///
     /// - Unsupported target OS
-    pub fn build(&self) -> anyhow::Result<AutoLaunch> {
-        if self.app_name.is_none() {
-            anyhow::bail!("The `app_name` should not be none.");
-        }
-
-        if self.app_path.is_none() {
-            anyhow::bail!("The `app_path` should not be none.");
-        }
-
-        let app_name = self.app_name.clone().unwrap();
-        let app_path = self.app_path.clone().unwrap();
+    pub fn build(&self) -> Result<AutoLaunch> {
+        let app_name = self.app_name.as_ref().ok_or(Error::AppNameNotSpecified)?;
+        let app_path = self.app_path.as_ref().ok_or(Error::AppPathNotSpecified)?;
         let args = self.args.clone().unwrap_or_default();
 
         #[cfg(target_os = "linux")]
@@ -315,6 +325,6 @@ impl AutoLaunchBuilder {
         return Ok(AutoLaunch::new(&app_name, &app_path, &args));
 
         #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
-        panic!("unsupported target os");
+        return Err(Error::UnsupportedOS);
     }
 }

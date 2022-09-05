@@ -1,5 +1,4 @@
-use crate::AutoLaunch;
-use anyhow::Result;
+use crate::{AutoLaunch, Result};
 use winreg::enums::{HKEY_CURRENT_USER, KEY_READ, KEY_SET_VALUE};
 use winreg::RegKey;
 

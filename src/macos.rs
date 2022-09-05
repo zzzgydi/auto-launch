@@ -1,5 +1,4 @@
-use crate::AutoLaunch;
-use anyhow::{bail, Result};
+use crate::{AutoLaunch, Result};
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -72,11 +71,11 @@ impl AutoLaunch {
         let path = Path::new(&self.app_path);
 
         if !path.exists() {
-            bail!("app path does not exist");
+            return Err(Error::AppPathDoesntExist(path.to_path_buf()));
         }
 
         if !path.is_absolute() {
-            bail!("app path is not absolute path");
+            return Err(Error::AppPathIsNotAbsolute(path.to_path_buf()));
         }
 
         if self.use_launch_agent {
