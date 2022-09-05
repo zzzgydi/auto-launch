@@ -1,4 +1,4 @@
-use crate::{AutoLaunch, Result};
+use crate::{AutoLaunch, Error, Result};
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -125,10 +125,7 @@ impl AutoLaunch {
             let command = format!("make login item at end with properties {}", props);
             let output = exec_apple_script(&command)?;
             if !output.status.success() {
-                bail!(
-                    "failed to execute apple script with status {}",
-                    output.status.code().unwrap_or(1)
-                );
+                return Err(Error::AppleScriptFailed(output.status.code().unwrap_or(1)));
             }
         }
         Ok(())
@@ -155,10 +152,7 @@ impl AutoLaunch {
             let command = format!("delete login item \"{}\"", self.app_name);
             let output = exec_apple_script(&command)?;
             if !output.status.success() {
-                bail!(
-                    "failed to execute apple script with status {}",
-                    output.status.code().unwrap_or(1)
-                );
+                return Err(Error::AppleScriptFailed(output.status.code().unwrap_or(1)));
             }
         }
         Ok(())

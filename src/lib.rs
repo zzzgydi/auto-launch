@@ -122,6 +122,8 @@ pub enum Error {
     AppPathDoesntExist(std::path::PathBuf),
     #[error("app path is not absolute: {0}")]
     AppPathIsNotAbsolute(std::path::PathBuf),
+    #[error("Failed to execute apple script with status: {0}")]
+    AppleScriptFailed(i32),
     #[error("Unsupported target os")]
     UnsupportedOS,
     #[error(transparent)]
