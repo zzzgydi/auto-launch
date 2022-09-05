@@ -11,7 +11,7 @@ description = "Auto launch any application or executable at startup. Supports Wi
 exclude = ["/test-exe"]
 
 [dependencies]
-anyhow = "1.0"
+thiserror = "1"
 
 [target."cfg(not(target_os = \"windows\"))".dependencies]
 dirs = "4.0"
