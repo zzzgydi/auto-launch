@@ -1,8 +1,8 @@
 [package]
 name = "auto-launch"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2021"
-authors = ["zzzgydi <segydi@foxmail.com>"]
+authors = ["zzzgydi"]
 license = "MIT"
 readme = "README.md"
 repository = "https://github.com/zzzgydi/auto-launch.git"
