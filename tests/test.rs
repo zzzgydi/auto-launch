@@ -10,6 +10,39 @@ mod unit_test {
     static TASK_MANAGER_OVERRIDE_REGKEY: &str =
         "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StartupApproved\\Run";
 
+    const TASK_MANAGER_OVERRIDE_TEST_DATA: [(bool, [u8; 12]); 5] = [
+        (
+            false,
+            [
+                0x03, 0x00, 0x00, 0x00, 0xa5, 0x20, 0xf6, 0x4a, 0x95, 0xd7, 0xd9, 0x01,
+            ],
+        ),
+        (
+            false,
+            [
+                0x01, 0x00, 0x00, 0x00, 0x5c, 0x25, 0xea, 0xfd, 0xcc, 0xae, 0xd9, 0x01,
+            ],
+        ),
+        (
+            true,
+            [
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            ],
+        ),
+        (
+            true,
+            [
+                0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            ],
+        ),
+        (
+            true,
+            [
+                0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            ],
+        ),
+    ];
+
     fn get_test_bin(name: &str) -> String {
         let ext = match cfg!(target_os = "windows") {
             true => ".exe",
@@ -206,40 +239,7 @@ mod unit_test {
         assert!(auto.enable().is_ok());
         assert!(auto.is_enabled().unwrap());
 
-        const TEST_DATA: [(bool, [u8; 12]); 5] = [
-            (
-                false,
-                [
-                    0x03, 0x00, 0x00, 0x00, 0xa5, 0x20, 0xf6, 0x4a, 0x95, 0xd7, 0xd9, 0x01,
-                ],
-            ),
-            (
-                false,
-                [
-                    0x01, 0x00, 0x00, 0x00, 0x5c, 0x25, 0xea, 0xfd, 0xcc, 0xae, 0xd9, 0x01,
-                ],
-            ),
-            (
-                true,
-                [
-                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                ],
-            ),
-            (
-                true,
-                [
-                    0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                ],
-            ),
-            (
-                true,
-                [
-                    0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                ],
-            ),
-        ];
-
-        for (expected_enabled, value) in TEST_DATA {
+        for (expected_enabled, value) in TASK_MANAGER_OVERRIDE_TEST_DATA {
             set_task_manager_override_value(app_name, value);
             assert_eq!(
                 auto.is_enabled().unwrap(),
@@ -248,6 +248,26 @@ mod unit_test {
                 value
             );
         }
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn test_windows_can_enable_after_disabled_by_task_manager() {
+        let app_name = "AutoLaunchTest";
+        let app_path = get_test_bin("auto-launch-test");
+        let args = &["--minimized"];
+        let app_path = app_path.as_str();
+
+        let auto = AutoLaunch::new(app_name, app_path, args);
+
+        assert!(auto.enable().is_ok());
+        assert!(auto.is_enabled().unwrap());
+
+        set_task_manager_override_value(app_name, TASK_MANAGER_OVERRIDE_TEST_DATA[0].1);
+        assert!(!auto.is_enabled().unwrap());
+
+        assert!(auto.enable().is_ok());
+        assert!(auto.is_enabled().unwrap());
     }
 
     // There will be conflicts with other test cases on macos

@@ -1,10 +1,14 @@
 use crate::{AutoLaunch, Result};
+use winreg::enums::RegType::REG_BINARY;
 use winreg::enums::{HKEY_CURRENT_USER, KEY_READ, KEY_SET_VALUE};
-use winreg::RegKey;
+use winreg::{RegKey, RegValue};
 
 static AL_REGKEY: &str = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run";
 static TASK_MANAGER_OVERRIDE_REGKEY: &str =
     "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StartupApproved\\Run";
+static TASK_MANAGER_OVERRIDE_ENABLED_VALUE: [u8; 12] = [
+    0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+];
 
 /// Windows implement
 impl AutoLaunch {
@@ -27,7 +31,7 @@ impl AutoLaunch {
     /// Enable the AutoLaunch setting
     ///
     /// ## Errors
-    ///
+    /// 
     /// - failed to open the registry key
     /// - failed to set value
     pub fn enable(&self) -> Result<()> {
@@ -36,6 +40,14 @@ impl AutoLaunch {
             .set_value::<_, _>(
                 &self.app_name,
                 &format!("{} {}", &self.app_path, &self.args.join(" ")),
+            )?;
+        hkcu.open_subkey_with_flags(TASK_MANAGER_OVERRIDE_REGKEY, KEY_SET_VALUE)?
+            .set_raw_value(
+                &self.app_name,
+                &RegValue {
+                    vtype: REG_BINARY,
+                    bytes: TASK_MANAGER_OVERRIDE_ENABLED_VALUE.to_vec(),
+                },
             )?;
         Ok(())
     }
