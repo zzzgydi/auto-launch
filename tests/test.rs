@@ -41,6 +41,7 @@ mod unit_test {
             .unwrap();
 
         assert_eq!(auto.get_app_name(), app_name);
+        dbg!(auto.enable());
         assert!(auto.enable().is_ok());
         assert!(auto.is_enabled().unwrap());
         assert!(auto.disable().is_ok());
@@ -124,6 +125,8 @@ mod windows_unit_test {
         let auto = AutoLaunch::new(app_name, app_path, args);
 
         assert_eq!(auto.get_app_name(), app_name);
+
+        dbg!(auto.enable());
         assert!(auto.enable().is_ok());
         assert!(auto.is_enabled().unwrap());
         assert!(auto.disable().is_ok());
