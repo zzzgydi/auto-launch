@@ -31,7 +31,7 @@ impl AutoLaunch {
     /// Enable the AutoLaunch setting
     ///
     /// ## Errors
-    /// 
+    ///
     /// - failed to open the registry key
     /// - failed to set value
     pub fn enable(&self) -> Result<()> {

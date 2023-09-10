@@ -2,6 +2,57 @@
 mod unit_test {
     use auto_launch::{AutoLaunch, AutoLaunchBuilder};
     use std::env::current_dir;
+
+    pub fn get_test_bin(name: &str) -> String {
+        let ext = match cfg!(target_os = "windows") {
+            true => ".exe",
+            false => "",
+        };
+        let test_bin = String::from(name) + ext;
+        let test_bin = current_dir()
+            .unwrap()
+            .join("test-exe/target/release")
+            .join(test_bin);
+
+        // if not exists, check the test exe
+        assert!(test_bin.exists());
+        test_bin.as_os_str().to_string_lossy().into_owned()
+    }
+
+    #[test]
+    fn test_support() {
+        assert!(AutoLaunch::is_support());
+    }
+
+    // There will be conflicts with other test cases on macos
+    #[cfg(not(target_os = "macos"))]
+    #[test]
+    fn test_builder() {
+        let app_name = "auto-launch-test";
+        let app_path = get_test_bin("auto-launch-test");
+        let args = &["--minimized"];
+        let app_path = app_path.as_str();
+
+        let auto = AutoLaunchBuilder::new()
+            .set_app_name(app_name)
+            .set_app_path(app_path)
+            .set_args(args)
+            .build()
+            .unwrap();
+
+        assert_eq!(auto.get_app_name(), app_name);
+        assert!(auto.enable().is_ok());
+        assert!(auto.is_enabled().unwrap());
+        assert!(auto.disable().is_ok());
+        assert!(!auto.is_enabled().unwrap());
+    }
+}
+
+#[cfg(windows)]
+#[cfg(test)]
+mod windows_unit_test {
+    use crate::unit_test::*;
+    use auto_launch::AutoLaunch;
     use winreg::{
         enums::{RegType, HKEY_CURRENT_USER, KEY_WRITE},
         RegKey, RegValue,
@@ -43,22 +94,6 @@ mod unit_test {
         ),
     ];
 
-    fn get_test_bin(name: &str) -> String {
-        let ext = match cfg!(target_os = "windows") {
-            true => ".exe",
-            false => "",
-        };
-        let test_bin = String::from(name) + ext;
-        let test_bin = current_dir()
-            .unwrap()
-            .join("test-exe/target/release")
-            .join(test_bin);
-
-        // if not exists, check the test exe
-        assert!(test_bin.exists());
-        test_bin.as_os_str().to_string_lossy().into_owned()
-    }
-
     fn set_task_manager_override_value(name: &str, value: [u8; 12]) {
         let subkey = get_task_manager_override_subkey();
         let reg_value = RegValue {
@@ -80,11 +115,58 @@ mod unit_test {
     }
 
     #[test]
-    fn test_support() {
-        assert!(AutoLaunch::is_support());
-    }
+    fn test_windows() {
+        let app_name = "AutoLaunchTest";
+        let app_path = get_test_bin("auto-launch-test");
+        let args = &["--minimized"];
+        let app_path = app_path.as_str();
 
-    #[cfg(target_os = "macos")]
+        let auto = AutoLaunch::new(app_name, app_path, args);
+
+        assert_eq!(auto.get_app_name(), app_name);
+        assert!(auto.enable().is_ok());
+        assert!(auto.is_enabled().unwrap());
+        assert!(auto.disable().is_ok());
+        assert!(!auto.is_enabled().unwrap());
+
+        // windows can enable after disabled by task manager
+        assert!(auto.enable().is_ok());
+        assert!(auto.is_enabled().unwrap());
+
+        set_task_manager_override_value(app_name, TASK_MANAGER_OVERRIDE_TEST_DATA[0].1);
+        assert!(!auto.is_enabled().unwrap());
+
+        assert!(auto.enable().is_ok());
+        assert!(auto.is_enabled().unwrap());
+
+        // test windows task manager overrides
+        delete_task_manager_override_value(app_name).ok(); // Ensure previous test runs are cleaned up
+
+        assert_eq!(auto.get_app_name(), app_name);
+        assert!(auto.enable().is_ok());
+        assert!(auto.is_enabled().unwrap());
+
+        for (expected_enabled, value) in TASK_MANAGER_OVERRIDE_TEST_DATA {
+            set_task_manager_override_value(app_name, value);
+            assert_eq!(
+                auto.is_enabled().unwrap(),
+                expected_enabled,
+                "{:02X?}",
+                value
+            );
+        }
+
+        assert!(auto.disable().is_ok());
+        assert!(!auto.is_enabled().unwrap());
+    }
+}
+
+#[cfg(macos)]
+#[cfg(test)]
+mod macos_unit_test {
+    use crate::unit_test::*;
+    use auto_launch::AutoLaunch;
+
     #[test]
     fn test_macos_new() {
         let name_1 = "AutoLaunchTest"; // different name
@@ -109,7 +191,6 @@ mod unit_test {
         assert_eq!(auto4.get_app_name(), name_2);
     }
 
-    #[cfg(target_os = "macos")]
     #[test]
     fn test_macos_main() {
         let app_name = "auto-launch-test";
@@ -178,8 +259,14 @@ mod unit_test {
         assert!(auto.disable().is_ok());
         assert!(!auto.is_enabled().unwrap());
     }
+}
 
-    #[cfg(target_os = "linux")]
+#[cfg(linux)]
+#[cfg(test)]
+mod linux_unit_test {
+    use crate::unit_test::*;
+    use auto_launch::AutoLaunch;
+
     #[test]
     fn test_linux() {
         let app_name = "AutoLaunchTest";
@@ -204,92 +291,5 @@ mod unit_test {
         assert!(auto2.is_enabled().unwrap());
         assert!(auto2.disable().is_ok());
         assert!(!auto2.is_enabled().unwrap());
-    }
-
-    #[cfg(target_os = "windows")]
-    #[test]
-    fn test_windows() {
-        let app_name = "AutoLaunchTest";
-        let app_path = get_test_bin("auto-launch-test");
-        let args = &["--minimized"];
-        let app_path = app_path.as_str();
-
-        let auto = AutoLaunch::new(app_name, app_path, args);
-
-        assert_eq!(auto.get_app_name(), app_name);
-        assert!(auto.enable().is_ok());
-        assert!(auto.is_enabled().unwrap());
-        assert!(auto.disable().is_ok());
-        assert!(!auto.is_enabled().unwrap());
-    }
-
-    #[cfg(target_os = "windows")]
-    #[test]
-    fn test_windows_task_manager_overrides() {
-        let app_name = "AutoLaunchTest";
-        let app_path = get_test_bin("auto-launch-test");
-        let args = &["--minimized"];
-        let app_path = app_path.as_str();
-
-        let auto = AutoLaunch::new(app_name, app_path, args);
-
-        delete_task_manager_override_value(app_name).ok(); // Ensure previous test runs are cleaned up
-
-        assert_eq!(auto.get_app_name(), app_name);
-        assert!(auto.enable().is_ok());
-        assert!(auto.is_enabled().unwrap());
-
-        for (expected_enabled, value) in TASK_MANAGER_OVERRIDE_TEST_DATA {
-            set_task_manager_override_value(app_name, value);
-            assert_eq!(
-                auto.is_enabled().unwrap(),
-                expected_enabled,
-                "{:02X?}",
-                value
-            );
-        }
-    }
-
-    #[cfg(target_os = "windows")]
-    #[test]
-    fn test_windows_can_enable_after_disabled_by_task_manager() {
-        let app_name = "AutoLaunchTest";
-        let app_path = get_test_bin("auto-launch-test");
-        let args = &["--minimized"];
-        let app_path = app_path.as_str();
-
-        let auto = AutoLaunch::new(app_name, app_path, args);
-
-        assert!(auto.enable().is_ok());
-        assert!(auto.is_enabled().unwrap());
-
-        set_task_manager_override_value(app_name, TASK_MANAGER_OVERRIDE_TEST_DATA[0].1);
-        assert!(!auto.is_enabled().unwrap());
-
-        assert!(auto.enable().is_ok());
-        assert!(auto.is_enabled().unwrap());
-    }
-
-    // There will be conflicts with other test cases on macos
-    #[cfg(not(target_os = "macos"))]
-    #[test]
-    fn test_builder() {
-        let app_name = "auto-launch-test";
-        let app_path = get_test_bin("auto-launch-test");
-        let args = &["--minimized"];
-        let app_path = app_path.as_str();
-
-        let auto = AutoLaunchBuilder::new()
-            .set_app_name(app_name)
-            .set_app_path(app_path)
-            .set_args(args)
-            .build()
-            .unwrap();
-
-        assert_eq!(auto.get_app_name(), app_name);
-        assert!(auto.enable().is_ok());
-        assert!(auto.is_enabled().unwrap());
-        assert!(auto.disable().is_ok());
-        assert!(!auto.is_enabled().unwrap());
     }
 }
