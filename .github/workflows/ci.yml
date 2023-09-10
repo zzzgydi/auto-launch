@@ -13,21 +13,18 @@ jobs:
       matrix:
         os:
           - macos-11
+          - macos-latest
           - ubuntu-latest
           - windows-latest
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
-      - name: Install Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          profile: minimal
-          override: true
+      - name: install Rust stable
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Rust Cache
-        uses: Swatinem/rust-cache@ce325b60658c1b38465c06cc965b79baf32c1e72
+        uses: Swatinem/rust-cache@2
 
       - name: Run cargo check
         run: cargo check
@@ -37,4 +34,4 @@ jobs:
           cd test-exe
           cargo build --release
           cd ..
-          cargo test
+          cargo test -- --nocapture
