@@ -1,8 +1,14 @@
 use crate::{AutoLaunch, Result};
+use winreg::enums::RegType::REG_BINARY;
 use winreg::enums::{HKEY_CURRENT_USER, KEY_READ, KEY_SET_VALUE};
-use winreg::RegKey;
+use winreg::{RegKey, RegValue};
 
 static AL_REGKEY: &str = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run";
+static TASK_MANAGER_OVERRIDE_REGKEY: &str =
+    "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StartupApproved\\Run";
+static TASK_MANAGER_OVERRIDE_ENABLED_VALUE: [u8; 12] = [
+    0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+];
 
 /// Windows implement
 impl AutoLaunch {
@@ -25,7 +31,7 @@ impl AutoLaunch {
     /// Enable the AutoLaunch setting
     ///
     /// ## Errors
-    ///
+    /// 
     /// - failed to open the registry key
     /// - failed to set value
     pub fn enable(&self) -> Result<()> {
@@ -34,6 +40,14 @@ impl AutoLaunch {
             .set_value::<_, _>(
                 &self.app_name,
                 &format!("{} {}", &self.app_path, &self.args.join(" ")),
+            )?;
+        hkcu.open_subkey_with_flags(TASK_MANAGER_OVERRIDE_REGKEY, KEY_SET_VALUE)?
+            .set_raw_value(
+                &self.app_name,
+                &RegValue {
+                    vtype: REG_BINARY,
+                    bytes: TASK_MANAGER_OVERRIDE_ENABLED_VALUE.to_vec(),
+                },
             )?;
         Ok(())
     }
@@ -54,9 +68,31 @@ impl AutoLaunch {
     /// Check whether the AutoLaunch setting is enabled
     pub fn is_enabled(&self) -> Result<bool> {
         let hkcu = RegKey::predef(HKEY_CURRENT_USER);
-        Ok(hkcu
+
+        let al_enabled = hkcu
             .open_subkey_with_flags(AL_REGKEY, KEY_READ)?
             .get_value::<String, _>(&self.app_name)
-            .is_ok())
+            .is_ok();
+        let task_manager_enabled = self.task_manager_enabled(hkcu);
+
+        Ok(al_enabled && task_manager_enabled.unwrap_or(true))
     }
+
+    fn task_manager_enabled(&self, hkcu: RegKey) -> Option<bool> {
+        let task_manager_override_raw_value = hkcu
+            .open_subkey_with_flags(TASK_MANAGER_OVERRIDE_REGKEY, KEY_READ)
+            .ok()?
+            .get_raw_value(&self.app_name)
+            .ok()?;
+        Some(last_eight_bytes_all_zeros(
+            &task_manager_override_raw_value.bytes,
+        )?)
+    }
+}
+
+fn last_eight_bytes_all_zeros(bytes: &[u8]) -> Option<bool> {
+    if bytes.len() < 8 {
+        return None;
+    }
+    Some(bytes.iter().rev().take(8).all(|v| *v == 0u8))
 }
