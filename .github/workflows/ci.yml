@@ -24,7 +24,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Rust Cache
-        uses: Swatinem/rust-cache@2
+        uses: Swatinem/rust-cache@v2
 
       - name: Run cargo check
         run: cargo check
