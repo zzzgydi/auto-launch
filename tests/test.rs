@@ -41,7 +41,6 @@ mod unit_test {
             .unwrap();
 
         assert_eq!(auto.get_app_name(), app_name);
-        dbg!(auto.enable());
         assert!(auto.enable().is_ok());
         assert!(auto.is_enabled().unwrap());
         assert!(auto.disable().is_ok());
@@ -96,7 +95,7 @@ mod windows_unit_test {
     ];
 
     fn set_task_manager_override_value(name: &str, value: [u8; 12]) {
-        let subkey = get_task_manager_override_subkey();
+        let subkey = get_task_manager_override_subkey().unwrap();
         let reg_value = RegValue {
             vtype: RegType::REG_BINARY,
             bytes: value.to_vec(),
@@ -105,14 +104,14 @@ mod windows_unit_test {
     }
 
     fn delete_task_manager_override_value(name: &str) -> std::io::Result<()> {
-        let subkey = get_task_manager_override_subkey();
+        let subkey = get_task_manager_override_subkey().unwrap();
         subkey.delete_value(name)
     }
 
-    fn get_task_manager_override_subkey() -> RegKey {
+    fn get_task_manager_override_subkey() -> Option<RegKey> {
         RegKey::predef(HKEY_CURRENT_USER)
             .open_subkey_with_flags(TASK_MANAGER_OVERRIDE_REGKEY, KEY_WRITE)
-            .unwrap()
+            .ok()
     }
 
     #[test]
@@ -126,41 +125,42 @@ mod windows_unit_test {
 
         assert_eq!(auto.get_app_name(), app_name);
 
-        dbg!(auto.enable());
         assert!(auto.enable().is_ok());
         assert!(auto.is_enabled().unwrap());
         assert!(auto.disable().is_ok());
         assert!(!auto.is_enabled().unwrap());
 
-        // windows can enable after disabled by task manager
-        assert!(auto.enable().is_ok());
-        assert!(auto.is_enabled().unwrap());
+        if get_task_manager_override_subkey().is_some() {
+            // windows can enable after disabled by task manager
+            assert!(auto.enable().is_ok());
+            assert!(auto.is_enabled().unwrap());
 
-        set_task_manager_override_value(app_name, TASK_MANAGER_OVERRIDE_TEST_DATA[0].1);
-        assert!(!auto.is_enabled().unwrap());
+            set_task_manager_override_value(app_name, TASK_MANAGER_OVERRIDE_TEST_DATA[0].1);
+            assert!(!auto.is_enabled().unwrap());
 
-        assert!(auto.enable().is_ok());
-        assert!(auto.is_enabled().unwrap());
+            assert!(auto.enable().is_ok());
+            assert!(auto.is_enabled().unwrap());
 
-        // test windows task manager overrides
-        delete_task_manager_override_value(app_name).ok(); // Ensure previous test runs are cleaned up
+            // test windows task manager overrides
+            delete_task_manager_override_value(app_name).ok(); // Ensure previous test runs are cleaned up
 
-        assert_eq!(auto.get_app_name(), app_name);
-        assert!(auto.enable().is_ok());
-        assert!(auto.is_enabled().unwrap());
+            assert_eq!(auto.get_app_name(), app_name);
+            assert!(auto.enable().is_ok());
+            assert!(auto.is_enabled().unwrap());
 
-        for (expected_enabled, value) in TASK_MANAGER_OVERRIDE_TEST_DATA {
-            set_task_manager_override_value(app_name, value);
-            assert_eq!(
-                auto.is_enabled().unwrap(),
-                expected_enabled,
-                "{:02X?}",
-                value
-            );
+            for (expected_enabled, value) in TASK_MANAGER_OVERRIDE_TEST_DATA {
+                set_task_manager_override_value(app_name, value);
+                assert_eq!(
+                    auto.is_enabled().unwrap(),
+                    expected_enabled,
+                    "{:02X?}",
+                    value
+                );
+            }
+
+            assert!(auto.disable().is_ok());
+            assert!(!auto.is_enabled().unwrap());
         }
-
-        assert!(auto.disable().is_ok());
-        assert!(!auto.is_enabled().unwrap());
     }
 }
 

@@ -41,14 +41,18 @@ impl AutoLaunch {
                 &self.app_name,
                 &format!("{} {}", &self.app_path, &self.args.join(" ")),
             )?;
-        hkcu.open_subkey_with_flags(TASK_MANAGER_OVERRIDE_REGKEY, KEY_SET_VALUE)?
-            .set_raw_value(
+
+        // this key maybe not found
+        if let Ok(reg) = hkcu.open_subkey_with_flags(TASK_MANAGER_OVERRIDE_REGKEY, KEY_SET_VALUE) {
+            reg.set_raw_value(
                 &self.app_name,
                 &RegValue {
                     vtype: REG_BINARY,
                     bytes: TASK_MANAGER_OVERRIDE_ENABLED_VALUE.to_vec(),
                 },
             )?;
+        }
+
         Ok(())
     }
 
