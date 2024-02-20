@@ -3,8 +3,10 @@ use winreg::enums::RegType::REG_BINARY;
 use winreg::enums::{HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE, KEY_READ, KEY_SET_VALUE};
 use winreg::{RegKey, RegValue};
 
-static ADMIN_REGKEY: &str = "SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Run";
+static ADMIN_AL_REGKEY: &str = "SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Run";
 static AL_REGKEY: &str = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run";
+static ADMIN_TASK_MANAGER_OVERRIDE_REGKEY: &str =
+    "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StartupApproved\\Run32";
 static TASK_MANAGER_OVERRIDE_REGKEY: &str =
     "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StartupApproved\\Run";
 static TASK_MANAGER_OVERRIDE_ENABLED_VALUE: [u8; 12] = [
@@ -38,14 +40,14 @@ impl AutoLaunch {
     pub fn enable(&self) -> Result<()> {
         let hkcu = RegKey::predef(HKEY_CURRENT_USER);
         let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
-        if let Ok(reg) = hklm.open_subkey_with_flags(ADMIN_REGKEY, KEY_SET_VALUE) {
+        if let Ok(reg) = hklm.open_subkey_with_flags(ADMIN_AL_REGKEY, KEY_SET_VALUE) {
             reg.set_value::<_, _>(
                 &self.app_name,
                 &format!("{} {}", &self.app_path, &self.args.join(" ")),
             )?;
             // this key maybe not found
             if let Ok(reg) =
-                hklm.open_subkey_with_flags(TASK_MANAGER_OVERRIDE_REGKEY, KEY_SET_VALUE)
+                hklm.open_subkey_with_flags(ADMIN_TASK_MANAGER_OVERRIDE_REGKEY, KEY_SET_VALUE)
             {
                 reg.set_raw_value(
                     &self.app_name,
@@ -88,7 +90,7 @@ impl AutoLaunch {
         let hkcu = RegKey::predef(HKEY_CURRENT_USER);
         let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
 
-        if let Ok(reg) = hklm.open_subkey_with_flags(ADMIN_REGKEY, KEY_SET_VALUE) {
+        if let Ok(reg) = hklm.open_subkey_with_flags(ADMIN_AL_REGKEY, KEY_SET_VALUE) {
             reg.delete_value(&self.app_name)?;
         } else {
             hkcu.open_subkey_with_flags(AL_REGKEY, KEY_SET_VALUE)?
@@ -103,24 +105,26 @@ impl AutoLaunch {
         let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
         // check if the app is enabled in the admin registry
         // use `KEY_SET_VALUE` to ensure have admin permission
-        if let Ok(reg) = hklm.open_subkey_with_flags(ADMIN_REGKEY, KEY_SET_VALUE) {
+        if let Ok(reg) = hklm.open_subkey_with_flags(ADMIN_AL_REGKEY, KEY_SET_VALUE) {
             let adm_enabled = reg.get_value::<String, _>(&self.app_name).is_ok();
-            let task_manager_enabled = self.task_manager_enabled(hklm);
+            let task_manager_enabled =
+                self.task_manager_enabled(hklm, ADMIN_TASK_MANAGER_OVERRIDE_REGKEY);
             Ok(adm_enabled && task_manager_enabled.unwrap_or(true))
         } else {
             let al_enabled = hkcu
                 .open_subkey_with_flags(AL_REGKEY, KEY_READ)?
                 .get_value::<String, _>(&self.app_name)
                 .is_ok();
-            let task_manager_enabled = self.task_manager_enabled(hkcu);
+            let task_manager_enabled =
+                self.task_manager_enabled(hkcu, TASK_MANAGER_OVERRIDE_REGKEY);
 
             Ok(al_enabled && task_manager_enabled.unwrap_or(true))
         }
     }
 
-    fn task_manager_enabled(&self, hk: RegKey) -> Option<bool> {
+    fn task_manager_enabled(&self, hk: RegKey, path: &str) -> Option<bool> {
         let task_manager_override_raw_value = hk
-            .open_subkey_with_flags(TASK_MANAGER_OVERRIDE_REGKEY, KEY_READ)
+            .open_subkey_with_flags(path, KEY_READ)
             .ok()?
             .get_raw_value(&self.app_name)
             .ok()?;
