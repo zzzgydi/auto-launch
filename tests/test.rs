@@ -51,16 +51,19 @@ mod unit_test {
 #[cfg(windows)]
 #[cfg(test)]
 mod windows_unit_test {
+    use std::error::Error;
+
     use crate::unit_test::*;
     use auto_launch::AutoLaunch;
     use winreg::{
-        enums::{RegType, HKEY_CURRENT_USER, KEY_WRITE},
+        enums::{RegType, HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE, KEY_WRITE},
         RegKey, RegValue,
     };
 
     static TASK_MANAGER_OVERRIDE_REGKEY: &str =
         "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StartupApproved\\Run";
-
+    static ADMIN_TASK_MANAGER_OVERRIDE_REGKEY: &str =
+        "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StartupApproved\\Run32";
     const TASK_MANAGER_OVERRIDE_TEST_DATA: [(bool, [u8; 12]); 5] = [
         (
             false,
@@ -103,6 +106,22 @@ mod windows_unit_test {
         subkey.set_raw_value(name, &reg_value).unwrap();
     }
 
+    fn set_admin_task_manager_override_value(
+        name: &str,
+        value: [u8; 12],
+    ) -> Result<(), Box<dyn Error>> {
+        if let Some(subkey) = get_admin_task_manager_override_subkey() {
+            let reg_value = RegValue {
+                vtype: RegType::REG_BINARY,
+                bytes: value.to_vec(),
+            };
+            subkey.set_raw_value(name, &reg_value)?;
+            Ok(())
+        } else {
+            Err("No admin task manager override subkey".into())
+        }
+    }
+
     fn delete_task_manager_override_value(name: &str) -> std::io::Result<()> {
         let subkey = get_task_manager_override_subkey().unwrap();
         subkey.delete_value(name)
@@ -111,6 +130,11 @@ mod windows_unit_test {
     fn get_task_manager_override_subkey() -> Option<RegKey> {
         RegKey::predef(HKEY_CURRENT_USER)
             .open_subkey_with_flags(TASK_MANAGER_OVERRIDE_REGKEY, KEY_WRITE)
+            .ok()
+    }
+    fn get_admin_task_manager_override_subkey() -> Option<RegKey> {
+        RegKey::predef(HKEY_LOCAL_MACHINE)
+            .open_subkey_with_flags(ADMIN_TASK_MANAGER_OVERRIDE_REGKEY, KEY_WRITE)
             .ok()
     }
 
@@ -134,8 +158,12 @@ mod windows_unit_test {
             // windows can enable after disabled by task manager
             assert!(auto.enable().is_ok());
             assert!(auto.is_enabled().unwrap());
+            set_admin_task_manager_override_value(app_name, TASK_MANAGER_OVERRIDE_TEST_DATA[0].1)
+                .unwrap_or(set_task_manager_override_value(
+                    app_name,
+                    TASK_MANAGER_OVERRIDE_TEST_DATA[0].1,
+                ));
 
-            set_task_manager_override_value(app_name, TASK_MANAGER_OVERRIDE_TEST_DATA[0].1);
             assert!(!auto.is_enabled().unwrap());
 
             assert!(auto.enable().is_ok());
@@ -149,7 +177,8 @@ mod windows_unit_test {
             assert!(auto.is_enabled().unwrap());
 
             for (expected_enabled, value) in TASK_MANAGER_OVERRIDE_TEST_DATA {
-                set_task_manager_override_value(app_name, value);
+                set_admin_task_manager_override_value(app_name, value)
+                    .unwrap_or(set_task_manager_override_value(app_name, value));
                 assert_eq!(
                     auto.is_enabled().unwrap(),
                     expected_enabled,
