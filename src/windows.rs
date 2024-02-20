@@ -1,6 +1,8 @@
 use crate::{AutoLaunch, Result};
 use winreg::enums::RegType::REG_BINARY;
-use winreg::enums::{HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE, KEY_READ, KEY_SET_VALUE};
+use winreg::enums::{
+    HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE, KEY_ALL_ACCESS, KEY_READ, KEY_SET_VALUE,
+};
 use winreg::{RegKey, RegValue};
 
 static ADMIN_AL_REGKEY: &str = "SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Run";
@@ -104,8 +106,8 @@ impl AutoLaunch {
         let hkcu = RegKey::predef(HKEY_CURRENT_USER);
         let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
         // check if the app is enabled in the admin registry
-        // use `KEY_SET_VALUE` to ensure have admin permission
-        if let Ok(reg) = hklm.open_subkey_with_flags(ADMIN_AL_REGKEY, KEY_SET_VALUE) {
+        // use `KEY_ALL_ACCESS` to ensure have admin permission
+        if let Ok(reg) = hklm.open_subkey_with_flags(ADMIN_AL_REGKEY, KEY_ALL_ACCESS) {
             let adm_enabled = reg.get_value::<String, _>(&self.app_name).is_ok();
             let task_manager_enabled =
                 self.task_manager_enabled(hklm, ADMIN_TASK_MANAGER_OVERRIDE_REGKEY);
