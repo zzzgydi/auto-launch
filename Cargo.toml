@@ -17,4 +17,4 @@ thiserror = "1"
 dirs = "4.0"
 
 [target.'cfg(windows)'.dependencies]
-winreg = { version = "0.10" }
+winreg = "0.52"
