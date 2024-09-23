@@ -55,10 +55,7 @@ mod windows_unit_test {
 
     use crate::unit_test::*;
     use auto_launch::AutoLaunch;
-    use winreg::{
-        enums::{RegType, HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE, KEY_WRITE},
-        RegKey, RegValue,
-    };
+    use windows_registry::{Key as RegKey, CURRENT_USER, LOCAL_MACHINE};
 
     static TASK_MANAGER_OVERRIDE_REGKEY: &str =
         "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StartupApproved\\Run";
@@ -99,11 +96,7 @@ mod windows_unit_test {
 
     fn set_task_manager_override_value(name: &str, value: [u8; 12]) {
         let subkey = get_task_manager_override_subkey().unwrap();
-        let reg_value = RegValue {
-            vtype: RegType::REG_BINARY,
-            bytes: value.to_vec(),
-        };
-        subkey.set_raw_value(name, &reg_value).unwrap();
+        subkey.set_bytes(name, &value).unwrap();
     }
 
     fn set_admin_task_manager_override_value(
@@ -111,11 +104,7 @@ mod windows_unit_test {
         value: [u8; 12],
     ) -> Result<(), Box<dyn Error>> {
         if let Some(subkey) = get_admin_task_manager_override_subkey() {
-            let reg_value = RegValue {
-                vtype: RegType::REG_BINARY,
-                bytes: value.to_vec(),
-            };
-            subkey.set_raw_value(name, &reg_value)?;
+            subkey.set_bytes(name, &value)?;
             Ok(())
         } else {
             Err("No admin task manager override subkey".into())
@@ -124,18 +113,19 @@ mod windows_unit_test {
 
     fn delete_task_manager_override_value(name: &str) -> std::io::Result<()> {
         let subkey = get_task_manager_override_subkey().unwrap();
-        subkey.delete_value(name)
+        subkey.remove_value(name).map_err(|e| {
+            std::io::Error::new(
+                std::io::ErrorKind::Other,
+                format!("failed to remove value: {}", e),
+            )
+        })
     }
 
     fn get_task_manager_override_subkey() -> Option<RegKey> {
-        RegKey::predef(HKEY_CURRENT_USER)
-            .open_subkey_with_flags(TASK_MANAGER_OVERRIDE_REGKEY, KEY_WRITE)
-            .ok()
+        CURRENT_USER.open(TASK_MANAGER_OVERRIDE_REGKEY).ok()
     }
     fn get_admin_task_manager_override_subkey() -> Option<RegKey> {
-        RegKey::predef(HKEY_LOCAL_MACHINE)
-            .open_subkey_with_flags(ADMIN_TASK_MANAGER_OVERRIDE_REGKEY, KEY_WRITE)
-            .ok()
+        LOCAL_MACHINE.open(ADMIN_TASK_MANAGER_OVERRIDE_REGKEY).ok()
     }
 
     #[test]
@@ -158,11 +148,9 @@ mod windows_unit_test {
             // windows can enable after disabled by task manager
             assert!(auto.enable().is_ok());
             assert!(auto.is_enabled().unwrap());
+            set_task_manager_override_value(app_name, TASK_MANAGER_OVERRIDE_TEST_DATA[0].1);
             set_admin_task_manager_override_value(app_name, TASK_MANAGER_OVERRIDE_TEST_DATA[0].1)
-                .unwrap_or(set_task_manager_override_value(
-                    app_name,
-                    TASK_MANAGER_OVERRIDE_TEST_DATA[0].1,
-                ));
+                .unwrap_or(());
 
             assert!(!auto.is_enabled().unwrap());
 
@@ -177,8 +165,8 @@ mod windows_unit_test {
             assert!(auto.is_enabled().unwrap());
 
             for (expected_enabled, value) in TASK_MANAGER_OVERRIDE_TEST_DATA {
-                set_admin_task_manager_override_value(app_name, value)
-                    .unwrap_or(set_task_manager_override_value(app_name, value));
+                set_task_manager_override_value(app_name, value);
+                set_admin_task_manager_override_value(app_name, value).unwrap_or(());
                 assert_eq!(
                     auto.is_enabled().unwrap(),
                     expected_enabled,
@@ -193,7 +181,7 @@ mod windows_unit_test {
     }
 }
 
-#[cfg(macos)]
+#[cfg(target_os = "macos")]
 #[cfg(test)]
 mod macos_unit_test {
     use crate::unit_test::*;
@@ -293,7 +281,7 @@ mod macos_unit_test {
     }
 }
 
-#[cfg(linux)]
+#[cfg(target_os = "linux")]
 #[cfg(test)]
 mod linux_unit_test {
     use crate::unit_test::*;
