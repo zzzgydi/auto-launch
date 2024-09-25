@@ -315,16 +315,16 @@ impl AutoLaunchBuilder {
         let args = self.args.clone().unwrap_or_default();
 
         #[cfg(target_os = "linux")]
-        return Ok(AutoLaunch::new(&app_name, &app_path, &args));
+        return Ok(AutoLaunch::new(app_name, app_path, &args));
         #[cfg(target_os = "macos")]
         return Ok(AutoLaunch::new(
-            &app_name,
-            &app_path,
+            app_name,
+            app_path,
             self.use_launch_agent,
             &args,
         ));
         #[cfg(target_os = "windows")]
-        return Ok(AutoLaunch::new(&app_name, &app_path, &args));
+        return Ok(AutoLaunch::new(app_name, app_path, &args));
 
         #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
         return Err(Error::UnsupportedOS);

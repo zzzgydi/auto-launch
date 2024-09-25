@@ -1,9 +1,5 @@
 use crate::{AutoLaunch, Result};
-use winreg::enums::RegType::REG_BINARY;
-use winreg::enums::{
-    HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE, KEY_ALL_ACCESS, KEY_READ, KEY_SET_VALUE,
-};
-use winreg::{RegKey, RegValue};
+use windows_registry::{Key, CURRENT_USER, LOCAL_MACHINE};
 
 static ADMIN_AL_REGKEY: &str = "SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Run";
 static AL_REGKEY: &str = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run";
@@ -40,42 +36,55 @@ impl AutoLaunch {
     /// - failed to open the registry key
     /// - failed to set value
     pub fn enable(&self) -> Result<()> {
-        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
-        let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
-        if let Ok(reg) = hklm.open_subkey_with_flags(ADMIN_AL_REGKEY, KEY_SET_VALUE) {
-            reg.set_value::<_, _>(
+        if let Ok(key) = LOCAL_MACHINE.open(ADMIN_AL_REGKEY) {
+            key.set_string(
                 &self.app_name,
                 &format!("{} {}", &self.app_path, &self.args.join(" ")),
-            )?;
+            )
+            .map_err(|e| {
+                std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    format!("failed to set {ADMIN_AL_REGKEY}: {}", e),
+                )
+            })?;
             // this key maybe not found
-            if let Ok(reg) =
-                hklm.open_subkey_with_flags(ADMIN_TASK_MANAGER_OVERRIDE_REGKEY, KEY_SET_VALUE)
-            {
-                reg.set_raw_value(
-                    &self.app_name,
-                    &RegValue {
-                        vtype: REG_BINARY,
-                        bytes: TASK_MANAGER_OVERRIDE_ENABLED_VALUE.to_vec(),
-                    },
-                )?;
+            if let Ok(key) = LOCAL_MACHINE.open(ADMIN_TASK_MANAGER_OVERRIDE_REGKEY) {
+                key.set_bytes(&self.app_name, &TASK_MANAGER_OVERRIDE_ENABLED_VALUE)
+                    .map_err(|e| {
+                        std::io::Error::new(
+                            std::io::ErrorKind::Other,
+                            format!("failed to set {ADMIN_TASK_MANAGER_OVERRIDE_REGKEY}: {}", e),
+                        )
+                    })?;
             }
         } else {
-            hkcu.open_subkey_with_flags(AL_REGKEY, KEY_SET_VALUE)?
-                .set_value::<_, _>(
+            CURRENT_USER
+                .open(AL_REGKEY)
+                .map_err(|e| {
+                    std::io::Error::new(
+                        std::io::ErrorKind::NotFound,
+                        format!("failed to open {AL_REGKEY}: {}", e),
+                    )
+                })?
+                .set_string(
                     &self.app_name,
                     &format!("{} {}", &self.app_path, &self.args.join(" ")),
-                )?;
+                )
+                .map_err(|e| {
+                    std::io::Error::new(
+                        std::io::ErrorKind::Other,
+                        format!("failed to set {AL_REGKEY}: {}", e),
+                    )
+                })?;
             // this key maybe not found
-            if let Ok(reg) =
-                hkcu.open_subkey_with_flags(TASK_MANAGER_OVERRIDE_REGKEY, KEY_SET_VALUE)
-            {
-                reg.set_raw_value(
-                    &self.app_name,
-                    &RegValue {
-                        vtype: REG_BINARY,
-                        bytes: TASK_MANAGER_OVERRIDE_ENABLED_VALUE.to_vec(),
-                    },
-                )?;
+            if let Ok(key) = CURRENT_USER.open(TASK_MANAGER_OVERRIDE_REGKEY) {
+                key.set_bytes(&self.app_name, &TASK_MANAGER_OVERRIDE_ENABLED_VALUE)
+                    .map_err(|e| {
+                        std::io::Error::new(
+                            std::io::ErrorKind::Other,
+                            format!("failed to set {TASK_MANAGER_OVERRIDE_REGKEY}: {}", e),
+                        )
+                    })?;
             }
         }
 
@@ -89,50 +98,63 @@ impl AutoLaunch {
     /// - failed to open the registry key
     /// - failed to delete value
     pub fn disable(&self) -> Result<()> {
-        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
-        let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
-
-        if let Ok(reg) = hklm.open_subkey_with_flags(ADMIN_AL_REGKEY, KEY_SET_VALUE) {
-            reg.delete_value(&self.app_name)?;
+        if let Ok(reg) = LOCAL_MACHINE.open(ADMIN_AL_REGKEY) {
+            reg.remove_value(&self.app_name).map_err(|e| {
+                std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    format!("failed to remove {ADMIN_AL_REGKEY}: {}", e),
+                )
+            })?;
         } else {
-            hkcu.open_subkey_with_flags(AL_REGKEY, KEY_SET_VALUE)?
-                .delete_value(&self.app_name)?;
+            CURRENT_USER
+                .open(AL_REGKEY)
+                .map_err(|e| {
+                    std::io::Error::new(
+                        std::io::ErrorKind::NotFound,
+                        format!("failed to open {AL_REGKEY}: {}", e),
+                    )
+                })?
+                .remove_value(&self.app_name)
+                .map_err(|e| {
+                    std::io::Error::new(
+                        std::io::ErrorKind::Other,
+                        format!("failed to remove {AL_REGKEY}: {}", e),
+                    )
+                })?;
         }
         Ok(())
     }
 
     /// Check whether the AutoLaunch setting is enabled
     pub fn is_enabled(&self) -> Result<bool> {
-        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
-        let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
         // check if the app is enabled in the admin registry
         // use `KEY_ALL_ACCESS` to ensure have admin permission
-        if let Ok(reg) = hklm.open_subkey_with_flags(ADMIN_AL_REGKEY, KEY_ALL_ACCESS) {
-            let adm_enabled = reg.get_value::<String, _>(&self.app_name).is_ok();
+        if let Ok(key) = LOCAL_MACHINE.open(ADMIN_AL_REGKEY) {
+            let adm_enabled = key.get_string(&self.app_name).is_ok();
             let task_manager_enabled =
-                self.task_manager_enabled(hklm, ADMIN_TASK_MANAGER_OVERRIDE_REGKEY);
+                self.task_manager_enabled(LOCAL_MACHINE, ADMIN_TASK_MANAGER_OVERRIDE_REGKEY);
             Ok(adm_enabled && task_manager_enabled.unwrap_or(true))
         } else {
-            let al_enabled = hkcu
-                .open_subkey_with_flags(AL_REGKEY, KEY_READ)?
-                .get_value::<String, _>(&self.app_name)
+            let al_enabled = CURRENT_USER
+                .open(AL_REGKEY)
+                .map_err(|e| {
+                    std::io::Error::new(
+                        std::io::ErrorKind::NotFound,
+                        format!("failed to open {AL_REGKEY}: {}", e),
+                    )
+                })?
+                .get_string(&self.app_name)
                 .is_ok();
             let task_manager_enabled =
-                self.task_manager_enabled(hkcu, TASK_MANAGER_OVERRIDE_REGKEY);
+                self.task_manager_enabled(CURRENT_USER, TASK_MANAGER_OVERRIDE_REGKEY);
 
             Ok(al_enabled && task_manager_enabled.unwrap_or(true))
         }
     }
 
-    fn task_manager_enabled(&self, hk: RegKey, path: &str) -> Option<bool> {
-        let task_manager_override_raw_value = hk
-            .open_subkey_with_flags(path, KEY_READ)
-            .ok()?
-            .get_raw_value(&self.app_name)
-            .ok()?;
-        Some(last_eight_bytes_all_zeros(
-            &task_manager_override_raw_value.bytes,
-        )?)
+    fn task_manager_enabled(&self, hk: &Key, path: &str) -> Option<bool> {
+        let task_manager_override_raw_value = hk.open(path).ok()?.get_bytes(&self.app_name).ok()?;
+        last_eight_bytes_all_zeros(&task_manager_override_raw_value)
     }
 }
 
