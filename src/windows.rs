@@ -49,13 +49,17 @@ impl AutoLaunch {
             })?;
             // this key maybe not found
             if let Ok(key) = LOCAL_MACHINE.open(ADMIN_TASK_MANAGER_OVERRIDE_REGKEY) {
-                key.set_bytes(&self.app_name, &TASK_MANAGER_OVERRIDE_ENABLED_VALUE)
-                    .map_err(|e| {
-                        std::io::Error::new(
-                            std::io::ErrorKind::Other,
-                            format!("failed to set {ADMIN_TASK_MANAGER_OVERRIDE_REGKEY}: {}", e),
-                        )
-                    })?;
+                key.set_bytes(
+                    &self.app_name,
+                    windows_registry::Type::Bytes,
+                    &TASK_MANAGER_OVERRIDE_ENABLED_VALUE,
+                )
+                .map_err(|e| {
+                    std::io::Error::new(
+                        std::io::ErrorKind::Other,
+                        format!("failed to set {ADMIN_TASK_MANAGER_OVERRIDE_REGKEY}: {}", e),
+                    )
+                })?;
             }
         } else {
             CURRENT_USER
@@ -78,13 +82,17 @@ impl AutoLaunch {
                 })?;
             // this key maybe not found
             if let Ok(key) = CURRENT_USER.open(TASK_MANAGER_OVERRIDE_REGKEY) {
-                key.set_bytes(&self.app_name, &TASK_MANAGER_OVERRIDE_ENABLED_VALUE)
-                    .map_err(|e| {
-                        std::io::Error::new(
-                            std::io::ErrorKind::Other,
-                            format!("failed to set {TASK_MANAGER_OVERRIDE_REGKEY}: {}", e),
-                        )
-                    })?;
+                key.set_bytes(
+                    &self.app_name,
+                    windows_registry::Type::Bytes,
+                    &TASK_MANAGER_OVERRIDE_ENABLED_VALUE,
+                )
+                .map_err(|e| {
+                    std::io::Error::new(
+                        std::io::ErrorKind::Other,
+                        format!("failed to set {TASK_MANAGER_OVERRIDE_REGKEY}: {}", e),
+                    )
+                })?;
             }
         }
 
@@ -153,7 +161,7 @@ impl AutoLaunch {
     }
 
     fn task_manager_enabled(&self, hk: &Key, path: &str) -> Option<bool> {
-        let task_manager_override_raw_value = hk.open(path).ok()?.get_bytes(&self.app_name).ok()?;
+        let task_manager_override_raw_value = hk.open(path).ok()?.get_value(&self.app_name).ok()?;
         last_eight_bytes_all_zeros(&task_manager_override_raw_value)
     }
 }
