@@ -17,4 +17,4 @@ thiserror = "2"
 dirs = "5.0.1"
 
 [target.'cfg(windows)'.dependencies]
-windows-registry = "0.3.0"
+windows-registry = { version = "0.3.0", features = ["std"] }

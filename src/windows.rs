@@ -1,13 +1,13 @@
 use crate::{AutoLaunch, Result};
 use windows_registry::{Key, CURRENT_USER, LOCAL_MACHINE};
 
-static ADMIN_AL_REGKEY: &str = "SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Run";
-static AL_REGKEY: &str = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run";
-static ADMIN_TASK_MANAGER_OVERRIDE_REGKEY: &str =
+const ADMIN_AL_REGKEY: &str = "SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Run";
+const AL_REGKEY: &str = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run";
+const ADMIN_TASK_MANAGER_OVERRIDE_REGKEY: &str =
     "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StartupApproved\\Run32";
-static TASK_MANAGER_OVERRIDE_REGKEY: &str =
+const TASK_MANAGER_OVERRIDE_REGKEY: &str =
     "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StartupApproved\\Run";
-static TASK_MANAGER_OVERRIDE_ENABLED_VALUE: [u8; 12] = [
+const TASK_MANAGER_OVERRIDE_ENABLED_VALUE: [u8; 12] = [
     0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 ];
 
@@ -36,66 +36,51 @@ impl AutoLaunch {
     /// - failed to open the registry key
     /// - failed to set value
     pub fn enable(&self) -> Result<()> {
-        if let Ok(key) = LOCAL_MACHINE.open(ADMIN_AL_REGKEY) {
-            key.set_string(
+        self.enable_as_admin().or_else(|e| match e.kind() {
+            std::io::ErrorKind::PermissionDenied => {
+                self.enable_as_current_user().map_err(Into::into)
+            }
+            _ => Err(e.into()),
+        })
+    }
+
+    fn enable_as_admin(&self) -> std::io::Result<()> {
+        LOCAL_MACHINE.open(ADMIN_AL_REGKEY)?.set_string(
+            &self.app_name,
+            &format!("{} {}", &self.app_path, &self.args.join(" ")),
+        )?;
+        // this key maybe not found
+        if let Ok(key) = LOCAL_MACHINE.open(ADMIN_TASK_MANAGER_OVERRIDE_REGKEY) {
+            key.set_bytes(
                 &self.app_name,
-                &format!("{} {}", &self.app_path, &self.args.join(" ")),
-            )
+                windows_registry::Type::Bytes,
+                &TASK_MANAGER_OVERRIDE_ENABLED_VALUE,
+            )?;
+        }
+        Ok(())
+    }
+
+    fn enable_as_current_user(&self) -> std::io::Result<()> {
+        CURRENT_USER
+            .open(AL_REGKEY)
             .map_err(|e| {
                 std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    format!("failed to set {ADMIN_AL_REGKEY}: {}", e),
+                    std::io::ErrorKind::NotFound,
+                    format!("failed to open {AL_REGKEY}: {}", e),
                 )
-            })?;
-            // this key maybe not found
-            if let Ok(key) = LOCAL_MACHINE.open(ADMIN_TASK_MANAGER_OVERRIDE_REGKEY) {
-                key.set_bytes(
-                    &self.app_name,
-                    windows_registry::Type::Bytes,
-                    &TASK_MANAGER_OVERRIDE_ENABLED_VALUE,
-                )
-                .map_err(|e| {
-                    std::io::Error::new(
-                        std::io::ErrorKind::Other,
-                        format!("failed to set {ADMIN_TASK_MANAGER_OVERRIDE_REGKEY}: {}", e),
-                    )
-                })?;
-            }
-        } else {
-            CURRENT_USER
-                .open(AL_REGKEY)
-                .map_err(|e| {
-                    std::io::Error::new(
-                        std::io::ErrorKind::NotFound,
-                        format!("failed to open {AL_REGKEY}: {}", e),
-                    )
-                })?
-                .set_string(
-                    &self.app_name,
-                    &format!("{} {}", &self.app_path, &self.args.join(" ")),
-                )
-                .map_err(|e| {
-                    std::io::Error::new(
-                        std::io::ErrorKind::Other,
-                        format!("failed to set {AL_REGKEY}: {}", e),
-                    )
-                })?;
-            // this key maybe not found
-            if let Ok(key) = CURRENT_USER.open(TASK_MANAGER_OVERRIDE_REGKEY) {
-                key.set_bytes(
-                    &self.app_name,
-                    windows_registry::Type::Bytes,
-                    &TASK_MANAGER_OVERRIDE_ENABLED_VALUE,
-                )
-                .map_err(|e| {
-                    std::io::Error::new(
-                        std::io::ErrorKind::Other,
-                        format!("failed to set {TASK_MANAGER_OVERRIDE_REGKEY}: {}", e),
-                    )
-                })?;
-            }
+            })?
+            .set_string(
+                &self.app_name,
+                &format!("{} {}", &self.app_path, &self.args.join(" ")),
+            )?;
+        // this key maybe not found
+        if let Ok(key) = CURRENT_USER.open(TASK_MANAGER_OVERRIDE_REGKEY) {
+            key.set_bytes(
+                &self.app_name,
+                windows_registry::Type::Bytes,
+                &TASK_MANAGER_OVERRIDE_ENABLED_VALUE,
+            )?;
         }
-
         Ok(())
     }
 
@@ -106,58 +91,68 @@ impl AutoLaunch {
     /// - failed to open the registry key
     /// - failed to delete value
     pub fn disable(&self) -> Result<()> {
-        if let Ok(reg) = LOCAL_MACHINE.open(ADMIN_AL_REGKEY) {
-            reg.remove_value(&self.app_name).map_err(|e| {
-                std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    format!("failed to remove {ADMIN_AL_REGKEY}: {}", e),
-                )
-            })?;
-        } else {
-            CURRENT_USER
-                .open(AL_REGKEY)
-                .map_err(|e| {
-                    std::io::Error::new(
-                        std::io::ErrorKind::NotFound,
-                        format!("failed to open {AL_REGKEY}: {}", e),
-                    )
-                })?
-                .remove_value(&self.app_name)
-                .map_err(|e| {
-                    std::io::Error::new(
-                        std::io::ErrorKind::Other,
-                        format!("failed to remove {AL_REGKEY}: {}", e),
-                    )
-                })?;
-        }
+        self.disable_as_admin().or_else(|e| match e.kind() {
+            std::io::ErrorKind::PermissionDenied => {
+                self.disable_as_current_user().map_err(Into::into)
+            }
+            _ => Err(e.into()),
+        })
+    }
+
+    fn disable_as_admin(&self) -> std::io::Result<()> {
+        LOCAL_MACHINE
+            .open(ADMIN_AL_REGKEY)?
+            .remove_value(&self.app_name)?;
+        Ok(())
+    }
+
+    fn disable_as_current_user(&self) -> std::io::Result<()> {
+        CURRENT_USER.open(AL_REGKEY)?.remove_value(&self.app_name)?;
         Ok(())
     }
 
     /// Check whether the AutoLaunch setting is enabled
     pub fn is_enabled(&self) -> Result<bool> {
-        // check if the app is enabled in the admin registry
-        // use `KEY_ALL_ACCESS` to ensure have admin permission
-        if let Ok(key) = LOCAL_MACHINE.open(ADMIN_AL_REGKEY) {
-            let adm_enabled = key.get_string(&self.app_name).is_ok();
-            let task_manager_enabled =
-                self.task_manager_enabled(LOCAL_MACHINE, ADMIN_TASK_MANAGER_OVERRIDE_REGKEY);
-            Ok(adm_enabled && task_manager_enabled.unwrap_or(true))
-        } else {
-            let al_enabled = CURRENT_USER
-                .open(AL_REGKEY)
-                .map_err(|e| {
-                    std::io::Error::new(
-                        std::io::ErrorKind::NotFound,
-                        format!("failed to open {AL_REGKEY}: {}", e),
-                    )
-                })?
-                .get_string(&self.app_name)
-                .is_ok();
-            let task_manager_enabled =
-                self.task_manager_enabled(CURRENT_USER, TASK_MANAGER_OVERRIDE_REGKEY);
-
-            Ok(al_enabled && task_manager_enabled.unwrap_or(true))
+        match self.is_enabled_as_admin() {
+            Ok(false) => self.is_enabled_as_current_user().map_err(Into::into),
+            Err(e) if e.kind() == std::io::ErrorKind::PermissionDenied => {
+                self.is_enabled_as_current_user().map_err(Into::into)
+            }
+            Ok(enabled) => Ok(enabled),
+            Err(e) => Err(e.into()),
         }
+    }
+
+    fn is_enabled_as_admin(&self) -> std::io::Result<bool> {
+        let adm_enabled = LOCAL_MACHINE
+            .open(ADMIN_AL_REGKEY)?
+            .get_string(&self.app_name)
+            .map(|_| true)
+            .map_err(std::io::Error::from)
+            .or_else(|e| match e.kind() {
+                std::io::ErrorKind::NotFound => Ok(false),
+                _ => Err(e),
+            })?;
+        let task_manager_enabled = self
+            .task_manager_enabled(LOCAL_MACHINE, ADMIN_TASK_MANAGER_OVERRIDE_REGKEY)
+            .unwrap_or(true);
+        Ok(adm_enabled && task_manager_enabled)
+    }
+
+    fn is_enabled_as_current_user(&self) -> std::io::Result<bool> {
+        let al_enabled = CURRENT_USER
+            .open(AL_REGKEY)?
+            .get_string(&self.app_name)
+            .map(|_| true)
+            .map_err(std::io::Error::from)
+            .or_else(|e| match e.kind() {
+                std::io::ErrorKind::NotFound => Ok(false),
+                _ => Err(e),
+            })?;
+        let task_manager_enabled = self
+            .task_manager_enabled(CURRENT_USER, TASK_MANAGER_OVERRIDE_REGKEY)
+            .unwrap_or(true);
+        Ok(al_enabled && task_manager_enabled)
     }
 
     fn task_manager_enabled(&self, hk: &Key, path: &str) -> Option<bool> {
