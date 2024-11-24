@@ -9,6 +9,7 @@ dependencies = [
  "dirs",
  "thiserror 2.0.3",
  "windows-registry",
+ "windows-result",
 ]
 
 [[package]]

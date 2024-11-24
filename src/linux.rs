@@ -1,8 +1,5 @@
-use crate::AutoLaunch;
-use crate::Result;
-use std::fs;
-use std::io::Write;
-use std::path::PathBuf;
+use crate::{AutoLaunch, Result};
+use std::{fs, io::Write, path::PathBuf};
 
 /// Linux implement
 impl AutoLaunch {
@@ -47,7 +44,13 @@ impl AutoLaunch {
 
         let dir = get_dir();
         if !dir.exists() {
-            fs::create_dir(&dir)?;
+            fs::create_dir_all(&dir).or_else(|e| {
+                if e.kind() == std::io::ErrorKind::AlreadyExists {
+                    Ok(())
+                } else {
+                    Err(e)
+                }
+            })?;
         }
         let mut file = fs::OpenOptions::new()
             .write(true)
