@@ -49,7 +49,12 @@ impl AutoLaunch {
         if !dir.exists() {
             fs::create_dir(&dir)?;
         }
-        fs::File::create(self.get_file())?.write(data.as_bytes())?;
+        let mut file = fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(self.get_file())?;
+        file.write_all(data.as_bytes())?;
         Ok(())
     }
 
