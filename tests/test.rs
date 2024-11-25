@@ -24,7 +24,6 @@ mod unit_test {
         assert!(AutoLaunch::is_support());
     }
 
-    // There will be conflicts with other test cases on macos
     #[cfg(not(target_os = "macos"))]
     #[test]
     fn test_builder() {
@@ -41,9 +40,9 @@ mod unit_test {
             .unwrap();
 
         assert_eq!(auto.get_app_name(), app_name);
-        assert!(auto.enable().is_ok());
+        auto.enable().unwrap();
         assert!(auto.is_enabled().unwrap());
-        assert!(auto.disable().is_ok());
+        auto.disable().unwrap();
         assert!(!auto.is_enabled().unwrap());
     }
 }
@@ -96,7 +95,9 @@ mod windows_unit_test {
 
     fn set_task_manager_override_value(name: &str, value: [u8; 12]) {
         let subkey = get_task_manager_override_subkey().unwrap();
-        subkey.set_bytes(name, &value).unwrap();
+        subkey
+            .set_bytes(name, windows_registry::Type::Bytes, &value)
+            .unwrap();
     }
 
     fn set_admin_task_manager_override_value(
@@ -104,7 +105,7 @@ mod windows_unit_test {
         value: [u8; 12],
     ) -> Result<(), Box<dyn Error>> {
         if let Some(subkey) = get_admin_task_manager_override_subkey() {
-            subkey.set_bytes(name, &value)?;
+            subkey.set_bytes(name, windows_registry::Type::Bytes, &value)?;
             Ok(())
         } else {
             Err("No admin task manager override subkey".into())
@@ -139,14 +140,14 @@ mod windows_unit_test {
 
         assert_eq!(auto.get_app_name(), app_name);
 
-        assert!(auto.enable().is_ok());
+        auto.enable().unwrap();
         assert!(auto.is_enabled().unwrap());
-        assert!(auto.disable().is_ok());
+        auto.disable().unwrap();
         assert!(!auto.is_enabled().unwrap());
 
         if get_task_manager_override_subkey().is_some() {
             // windows can enable after disabled by task manager
-            assert!(auto.enable().is_ok());
+            auto.enable().unwrap();
             assert!(auto.is_enabled().unwrap());
             set_task_manager_override_value(app_name, TASK_MANAGER_OVERRIDE_TEST_DATA[0].1);
             set_admin_task_manager_override_value(app_name, TASK_MANAGER_OVERRIDE_TEST_DATA[0].1)
@@ -154,14 +155,14 @@ mod windows_unit_test {
 
             assert!(!auto.is_enabled().unwrap());
 
-            assert!(auto.enable().is_ok());
+            auto.enable().unwrap();
             assert!(auto.is_enabled().unwrap());
 
             // test windows task manager overrides
             delete_task_manager_override_value(app_name).ok(); // Ensure previous test runs are cleaned up
 
             assert_eq!(auto.get_app_name(), app_name);
-            assert!(auto.enable().is_ok());
+            auto.enable().unwrap();
             assert!(auto.is_enabled().unwrap());
 
             for (expected_enabled, value) in TASK_MANAGER_OVERRIDE_TEST_DATA {
@@ -175,7 +176,7 @@ mod windows_unit_test {
                 );
             }
 
-            assert!(auto.disable().is_ok());
+            auto.disable().unwrap();
             assert!(!auto.is_enabled().unwrap());
         }
     }
@@ -185,7 +186,7 @@ mod windows_unit_test {
 #[cfg(test)]
 mod macos_unit_test {
     use crate::unit_test::*;
-    use auto_launch::AutoLaunch;
+    use auto_launch::{AutoLaunch, AutoLaunchBuilder};
 
     #[test]
     fn test_macos_new() {
@@ -225,9 +226,9 @@ mod macos_unit_test {
         // use applescript
         let auto1 = AutoLaunch::new(app_name, app_path, false, args);
         assert_eq!(auto1.get_app_name(), app_name);
-        assert!(auto1.enable().is_ok());
+        auto1.enable().unwrap();
         assert!(auto1.is_enabled().unwrap());
-        assert!(auto1.disable().is_ok());
+        auto1.disable().unwrap();
         assert!(!auto1.is_enabled().unwrap());
 
         let auto2 = AutoLaunch::new(app_name_not, app_path_not, false, args);
@@ -238,16 +239,16 @@ mod macos_unit_test {
         // use launch agent
         let auto1 = AutoLaunch::new(app_name, app_path, true, args);
         assert_eq!(auto1.get_app_name(), app_name);
-        assert!(auto1.enable().is_ok());
+        auto1.enable().unwrap();
         assert!(auto1.is_enabled().unwrap());
-        assert!(auto1.disable().is_ok());
+        auto1.disable().unwrap();
         assert!(!auto1.is_enabled().unwrap());
 
         let auto2 = AutoLaunch::new(app_name, app_path_not, true, args);
         assert_eq!(auto2.get_app_name(), app_name); // will not change the name
         assert!(auto2.enable().is_err());
         assert!(!auto2.is_enabled().unwrap());
-        assert!(auto2.disable().is_ok());
+        auto2.disable().unwrap();
         assert!(!auto2.is_enabled().unwrap());
 
         // test builder
@@ -259,9 +260,9 @@ mod macos_unit_test {
             .unwrap();
 
         assert_eq!(auto.get_app_name(), app_name);
-        assert!(auto.enable().is_ok());
+        auto.enable().unwrap();
         assert!(auto.is_enabled().unwrap());
-        assert!(auto.disable().is_ok());
+        auto.disable().unwrap();
         assert!(!auto.is_enabled().unwrap());
 
         // use launch agent
@@ -274,9 +275,9 @@ mod macos_unit_test {
             .unwrap();
 
         assert_eq!(auto.get_app_name(), app_name);
-        assert!(auto.enable().is_ok());
+        auto.enable().unwrap();
         assert!(auto.is_enabled().unwrap());
-        assert!(auto.disable().is_ok());
+        auto.disable().unwrap();
         assert!(!auto.is_enabled().unwrap());
     }
 }
@@ -298,18 +299,18 @@ mod linux_unit_test {
         let auto1 = AutoLaunch::new(app_name, app_path, args);
 
         assert_eq!(auto1.get_app_name(), app_name);
-        assert!(auto1.enable().is_ok());
+        auto1.enable().unwrap();
         assert!(auto1.is_enabled().unwrap());
-        assert!(auto1.disable().is_ok());
+        auto1.disable().unwrap();
         assert!(!auto1.is_enabled().unwrap());
 
         // test args
         let auto2 = AutoLaunch::new(app_name, app_path, args);
 
         assert_eq!(auto2.get_app_name(), app_name);
-        assert!(auto2.enable().is_ok());
+        auto2.enable().unwrap();
         assert!(auto2.is_enabled().unwrap());
-        assert!(auto2.disable().is_ok());
+        auto2.disable().unwrap();
         assert!(!auto2.is_enabled().unwrap());
     }
 }
