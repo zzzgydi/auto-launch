@@ -1,4 +1,4 @@
-use crate::{AutoLaunch, Result};
+use crate::{AutoLaunch, Result, WindowsEnableMode};
 use windows_registry::{Key, CURRENT_USER, LOCAL_MACHINE};
 use windows_result::HRESULT;
 
@@ -19,15 +19,22 @@ impl AutoLaunch {
     /// Create a new AutoLaunch instance
     /// - `app_name`: application name
     /// - `app_path`: application path
+    /// - `enable_mode`: behavior of the enable feature
     /// - `args`: startup args passed to the binary
     ///
     /// ## Notes
     ///
     /// The parameters of `AutoLaunch::new` are different on each platform.
-    pub fn new(app_name: &str, app_path: &str, args: &[impl AsRef<str>]) -> AutoLaunch {
+    pub fn new(
+        app_name: &str,
+        app_path: &str,
+        enable_mode: WindowsEnableMode,
+        args: &[impl AsRef<str>],
+    ) -> AutoLaunch {
         AutoLaunch {
             app_name: app_name.into(),
             app_path: app_path.into(),
+            enable_mode,
             args: args.iter().map(|s| s.as_ref().to_string()).collect(),
         }
     }
@@ -39,15 +46,22 @@ impl AutoLaunch {
     /// - failed to open the registry key
     /// - failed to set value
     pub fn enable(&self) -> Result<()> {
-        self.enable_as_admin()
-            .or_else(|e| {
-                if e.code() == E_ACCESSDENIED {
-                    self.enable_as_current_user()
-                } else {
-                    Err(e)
-                }
-            })
-            .map_err(std::io::Error::from)?;
+        match self.enable_mode {
+            WindowsEnableMode::Dynamic => self
+                .enable_as_admin()
+                .or_else(|e| {
+                    if e.code() == E_ACCESSDENIED {
+                        self.enable_as_current_user()
+                    } else {
+                        Err(e)
+                    }
+                })
+                .map_err(std::io::Error::from)?,
+            WindowsEnableMode::CurrentUser => self
+                .enable_as_current_user()
+                .map_err(std::io::Error::from)?,
+            WindowsEnableMode::System => self.enable_as_admin().map_err(std::io::Error::from)?,
+        }
         Ok(())
     }
 
@@ -90,16 +104,21 @@ impl AutoLaunch {
     /// - failed to open the registry key
     /// - failed to delete value
     pub fn disable(&self) -> Result<()> {
-        self.disable_as_admin()
-            .or_else(|e| {
-                if e.code() == E_ACCESSDENIED {
-                    self.disable_as_current_user()
-                } else {
-                    Err(e)
-                }
-            })
-            .map_err(std::io::Error::from)?;
-        Ok(())
+        // try to delete both admin and current user registry values
+        match self.disable_as_admin() {
+            Ok(()) => {
+                // try to delete for current user aswell, ignoring errors
+                // this is useful in case the app was previously registered as a system-wide auto launch
+                // but changed to a current user only mode
+                let _ = self.disable_as_current_user();
+                Ok(())
+            }
+            Err(_e) => {
+                self.disable_as_current_user()
+                    .map_err(std::io::Error::from)?;
+                Ok(())
+            }
+        }
     }
 
     fn disable_as_admin(&self) -> windows_registry::Result<()> {
@@ -118,14 +137,18 @@ impl AutoLaunch {
 
     /// Check whether the AutoLaunch setting is enabled
     pub fn is_enabled(&self) -> Result<bool> {
-        let res = match self.is_enabled_as_admin() {
-            Ok(false) => self.is_enabled_as_current_user(),
-            Err(e) if e.code() == E_ACCESSDENIED => self.is_enabled_as_current_user(),
-            Ok(enabled) => Ok(enabled),
-            Err(e) => Err(e),
+        match self.enable_mode {
+            WindowsEnableMode::Dynamic => match self.is_enabled_as_admin() {
+                Ok(false) => self.is_enabled_as_current_user(),
+                Err(e) if e.code() == E_ACCESSDENIED => self.is_enabled_as_current_user(),
+                Ok(enabled) => Ok(enabled),
+                Err(e) => Err(e),
+            },
+            WindowsEnableMode::CurrentUser => self.is_enabled_as_current_user(),
+            WindowsEnableMode::System => self.is_enabled_as_admin(),
         }
-        .map_err(std::io::Error::from)?;
-        Ok(res)
+        .map_err(std::io::Error::from)
+        .map_err(Into::into)
     }
 
     fn is_enabled_as_admin(&self) -> windows_registry::Result<bool> {

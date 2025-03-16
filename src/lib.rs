@@ -62,7 +62,12 @@
 //!
 //! ### Windows
 //!
-//! On Windows, it will add a registry entry under `\HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\CurrentVersion\Run`.
+//! On Windows, it will add a registry entry under either `\HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Run` (system-wide) or
+//! `\HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\CurrentVersion\Run` (current user only).
+//!
+//! By default we try to apply the auto launch to the system registry, which requires admin privileges and applies the auto launch to any user in the system.
+//! If there's no permission to do so, we fallback to enabling it to the current user only.
+//! To change this behavior, you can use [`AutoLaunch::set_windows_enable_mode`].
 //!
 //! ```rust
 //! # #[cfg(target_os = "windows")]
@@ -192,6 +197,9 @@ pub struct AutoLaunch {
     /// Whether use Launch Agent for implement or use AppleScript
     pub(crate) use_launch_agent: bool,
 
+    #[cfg(windows)]
+    pub(crate) enable_mode: WindowsEnableMode,
+
     /// Args passed to the binary on startup
     pub(crate) args: Vec<String>,
 }
@@ -266,7 +274,27 @@ pub struct AutoLaunchBuilder {
 
     pub use_launch_agent: bool,
 
+    pub windows_enable_mode: WindowsEnableMode,
+
     pub args: Option<Vec<String>>,
+}
+
+/// Determines how the auto launch is enabled on Windows.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WindowsEnableMode {
+    /// Dynamically tries to enable the auto launch for the system (admin privileges required),
+    /// fallbacks to the current user if there is no permission to modify the system registry.
+    Dynamic,
+    /// Enables the auto launch for the current user only. Does not require admin permissions.
+    CurrentUser,
+    /// Enables the auto launch for all users. Requires admin permissions.
+    System,
+}
+
+impl Default for WindowsEnableMode {
+    fn default() -> Self {
+        Self::Dynamic
+    }
 }
 
 impl AutoLaunchBuilder {
@@ -290,6 +318,13 @@ impl AutoLaunchBuilder {
     /// This setting only works on macOS
     pub fn set_use_launch_agent(&mut self, use_launch_agent: bool) -> &mut Self {
         self.use_launch_agent = use_launch_agent;
+        self
+    }
+
+    /// Set the [`WindowsEnableMode`].
+    /// This setting only works on Windows
+    pub fn set_windows_enable_mode(&mut self, mode: WindowsEnableMode) -> &mut Self {
+        self.windows_enable_mode = mode;
         self
     }
 
@@ -324,7 +359,12 @@ impl AutoLaunchBuilder {
             &args,
         ));
         #[cfg(target_os = "windows")]
-        return Ok(AutoLaunch::new(app_name, app_path, &args));
+        return Ok(AutoLaunch::new(
+            app_name,
+            app_path,
+            self.windows_enable_mode,
+            &args,
+        ));
 
         #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
         return Err(Error::UnsupportedOS);
