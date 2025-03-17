@@ -4,9 +4,10 @@ mod unit_test {
     use std::env::current_dir;
 
     pub fn get_test_bin(name: &str) -> String {
-        let ext = match cfg!(target_os = "windows") {
-            true => ".exe",
-            false => "",
+        let ext = if cfg!(target_os = "windows") {
+            ".exe"
+        } else {
+            ""
         };
         let test_bin = String::from(name) + ext;
         let test_bin = current_dir()
@@ -50,16 +51,12 @@ mod unit_test {
 #[cfg(windows)]
 #[cfg(test)]
 mod windows_unit_test {
-    use std::error::Error;
-
     use crate::unit_test::*;
-    use auto_launch::AutoLaunch;
+    use auto_launch::{AutoLaunch, WindowsEnableMode};
     use windows_registry::{Key as RegKey, CURRENT_USER, LOCAL_MACHINE};
 
-    static TASK_MANAGER_OVERRIDE_REGKEY: &str =
-        "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StartupApproved\\Run";
-    static ADMIN_TASK_MANAGER_OVERRIDE_REGKEY: &str =
-        "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StartupApproved\\Run32";
+    const TASK_MANAGER_OVERRIDE_REGKEY: &str =
+        r"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run";
     const TASK_MANAGER_OVERRIDE_TEST_DATA: [(bool, [u8; 12]); 5] = [
         (
             false,
@@ -93,40 +90,24 @@ mod windows_unit_test {
         ),
     ];
 
-    fn set_task_manager_override_value(name: &str, value: [u8; 12]) {
-        let subkey = get_task_manager_override_subkey().unwrap();
+    fn set_task_manager_override_value(root_key: &RegKey, name: &str, value: [u8; 12]) {
+        let subkey = root_key
+            .options()
+            .write()
+            .open(TASK_MANAGER_OVERRIDE_REGKEY)
+            .unwrap();
         subkey
             .set_bytes(name, windows_registry::Type::Bytes, &value)
             .unwrap();
     }
 
-    fn set_admin_task_manager_override_value(
-        name: &str,
-        value: [u8; 12],
-    ) -> Result<(), Box<dyn Error>> {
-        if let Some(subkey) = get_admin_task_manager_override_subkey() {
-            subkey.set_bytes(name, windows_registry::Type::Bytes, &value)?;
-            Ok(())
-        } else {
-            Err("No admin task manager override subkey".into())
-        }
-    }
-
-    fn delete_task_manager_override_value(name: &str) -> std::io::Result<()> {
-        let subkey = get_task_manager_override_subkey().unwrap();
-        subkey.remove_value(name).map_err(|e| {
-            std::io::Error::new(
-                std::io::ErrorKind::Other,
-                format!("failed to remove value: {}", e),
-            )
-        })
-    }
-
-    fn get_task_manager_override_subkey() -> Option<RegKey> {
-        CURRENT_USER.open(TASK_MANAGER_OVERRIDE_REGKEY).ok()
-    }
-    fn get_admin_task_manager_override_subkey() -> Option<RegKey> {
-        LOCAL_MACHINE.open(ADMIN_TASK_MANAGER_OVERRIDE_REGKEY).ok()
+    fn delete_task_manager_override_value(root_key: &RegKey, name: &str) -> std::io::Result<()> {
+        let subkey = root_key
+            .options()
+            .write()
+            .open(TASK_MANAGER_OVERRIDE_REGKEY)
+            .map_err(Into::<std::io::Error>::into)?;
+        subkey.remove_value(name).map_err(Into::into)
     }
 
     #[test]
@@ -136,7 +117,25 @@ mod windows_unit_test {
         let args = &["--minimized"];
         let app_path = app_path.as_str();
 
-        let auto = AutoLaunch::new(app_name, app_path, args);
+        test_with_admin(app_name, app_path, args, WindowsEnableMode::CurrentUser);
+
+        if LOCAL_MACHINE
+            .options()
+            .write()
+            .open(TASK_MANAGER_OVERRIDE_REGKEY)
+            .is_ok()
+        {
+            test_with_admin(app_name, app_path, args, WindowsEnableMode::System);
+        }
+    }
+
+    fn test_with_admin(
+        app_name: &str,
+        app_path: &str,
+        args: &[&str],
+        enable_mode: WindowsEnableMode,
+    ) {
+        let auto = AutoLaunch::new(app_name, app_path, enable_mode, args);
 
         assert_eq!(auto.get_app_name(), app_name);
 
@@ -145,40 +144,43 @@ mod windows_unit_test {
         auto.disable().unwrap();
         assert!(!auto.is_enabled().unwrap());
 
-        if get_task_manager_override_subkey().is_some() {
-            // windows can enable after disabled by task manager
-            auto.enable().unwrap();
-            assert!(auto.is_enabled().unwrap());
-            set_task_manager_override_value(app_name, TASK_MANAGER_OVERRIDE_TEST_DATA[0].1);
-            set_admin_task_manager_override_value(app_name, TASK_MANAGER_OVERRIDE_TEST_DATA[0].1)
-                .unwrap_or(());
+        let root_key = match enable_mode {
+            WindowsEnableMode::Dynamic => LOCAL_MACHINE,
+            WindowsEnableMode::CurrentUser => CURRENT_USER,
+            WindowsEnableMode::System => LOCAL_MACHINE,
+        };
 
-            assert!(!auto.is_enabled().unwrap());
+        // windows can enable after disabled by task manager
+        auto.enable().unwrap();
+        assert!(auto.is_enabled().unwrap());
+        set_task_manager_override_value(root_key, app_name, TASK_MANAGER_OVERRIDE_TEST_DATA[0].1);
 
-            auto.enable().unwrap();
-            assert!(auto.is_enabled().unwrap());
+        assert!(!auto.is_enabled().unwrap());
 
-            // test windows task manager overrides
-            delete_task_manager_override_value(app_name).ok(); // Ensure previous test runs are cleaned up
+        auto.enable().unwrap();
+        assert!(auto.is_enabled().unwrap());
 
-            assert_eq!(auto.get_app_name(), app_name);
-            auto.enable().unwrap();
-            assert!(auto.is_enabled().unwrap());
+        // test windows task manager overrides
+        delete_task_manager_override_value(root_key, app_name).unwrap(); // Ensure previous test runs are cleaned up
 
-            for (expected_enabled, value) in TASK_MANAGER_OVERRIDE_TEST_DATA {
-                set_task_manager_override_value(app_name, value);
-                set_admin_task_manager_override_value(app_name, value).unwrap_or(());
-                assert_eq!(
-                    auto.is_enabled().unwrap(),
-                    expected_enabled,
-                    "{:02X?}",
-                    value
-                );
-            }
+        assert_eq!(auto.get_app_name(), app_name);
+        auto.enable().unwrap();
+        assert!(auto.is_enabled().unwrap());
 
-            auto.disable().unwrap();
-            assert!(!auto.is_enabled().unwrap());
+        for (expected_enabled, value) in TASK_MANAGER_OVERRIDE_TEST_DATA {
+            set_task_manager_override_value(root_key, app_name, value);
+            assert_eq!(
+                auto.is_enabled().unwrap(),
+                expected_enabled,
+                "{:02X?}",
+                value
+            );
         }
+
+        auto.disable().unwrap();
+        assert!(!auto.is_enabled().unwrap());
+
+        delete_task_manager_override_value(root_key, app_name).unwrap();
     }
 }
 
