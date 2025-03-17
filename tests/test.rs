@@ -91,11 +91,7 @@ mod windows_unit_test {
     ];
 
     fn set_task_manager_override_value(root_key: &RegKey, name: &str, value: [u8; 12]) {
-        let subkey = root_key
-            .options()
-            .write()
-            .open(TASK_MANAGER_OVERRIDE_REGKEY)
-            .unwrap();
+        let subkey = root_key.create(TASK_MANAGER_OVERRIDE_REGKEY).unwrap();
         subkey
             .set_bytes(name, windows_registry::Type::Bytes, &value)
             .unwrap();

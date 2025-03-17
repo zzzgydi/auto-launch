@@ -72,14 +72,14 @@
 //! ```rust
 //! # #[cfg(target_os = "windows")]
 //! # mod win {
-//! use auto_launch::AutoLaunch;
+//! use auto_launch::{AutoLaunch, WindowsEnableMode};
 //!
 //! fn main() {
 //!     let app_name = "the-app";
 //!     let app_path = "C:\\path\\to\\the-app.exe";
 //!     let args = &["--minimized"];
 //!     let enable_mode = WindowsEnableMode::CurrentUser;
-//!     let auto = AutoLaunch::new(app_name, app_path, args, enable_mode);
+//!     let auto = AutoLaunch::new(app_name, app_path, enable_mode, args);
 //!
 //!     // enable the auto launch
 //!     auto.enable().is_ok();
@@ -179,12 +179,12 @@ mod windows;
 /// ```rust
 /// # #[cfg(target_os = "windows")]
 /// # {
-/// # use auto_launch::AutoLaunch;
+/// # use auto_launch::{AutoLaunch, WindowsEnableMode};
 /// # let app_name = "the-app";
 /// # let app_path = "/path/to/the-app";
 /// # let args = &["--minimized"];
 /// # let enable_mode = WindowsEnableMode::CurrentUser;
-/// AutoLaunch::new(app_name, app_path, args, enable_mode);
+/// AutoLaunch::new(app_name, app_path, enable_mode, args);
 /// # }
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
