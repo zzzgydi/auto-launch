@@ -78,7 +78,8 @@
 //!     let app_name = "the-app";
 //!     let app_path = "C:\\path\\to\\the-app.exe";
 //!     let args = &["--minimized"];
-//!     let auto = AutoLaunch::new(app_name, app_path, args);
+//!     let enable_mode = WindowsEnableMode::CurrentUser;
+//!     let auto = AutoLaunch::new(app_name, app_path, args, enable_mode);
 //!
 //!     // enable the auto launch
 //!     auto.enable().is_ok();
@@ -182,7 +183,8 @@ mod windows;
 /// # let app_name = "the-app";
 /// # let app_path = "/path/to/the-app";
 /// # let args = &["--minimized"];
-/// AutoLaunch::new(app_name, app_path, args);
+/// # let enable_mode = WindowsEnableMode::CurrentUser;
+/// AutoLaunch::new(app_name, app_path, args, enable_mode);
 /// # }
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -193,15 +195,15 @@ pub struct AutoLaunch {
     /// The application executable path (absolute path will be better)
     pub(crate) app_path: String,
 
+    /// Args passed to the binary on startup
+    pub(crate) args: Vec<String>,
+
     #[cfg(target_os = "macos")]
     /// Whether use Launch Agent for implement or use AppleScript
     pub(crate) use_launch_agent: bool,
 
     #[cfg(windows)]
     pub(crate) enable_mode: WindowsEnableMode,
-
-    /// Args passed to the binary on startup
-    pub(crate) args: Vec<String>,
 }
 
 impl AutoLaunch {
@@ -340,9 +342,6 @@ impl AutoLaunchBuilder {
     ///
     /// - `app_name` is none
     /// - `app_path` is none
-    ///
-    /// ## Panics
-    ///
     /// - Unsupported target OS
     pub fn build(&self) -> Result<AutoLaunch> {
         let app_name = self.app_name.as_ref().ok_or(Error::AppNameNotSpecified)?;

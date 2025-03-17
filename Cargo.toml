@@ -14,8 +14,8 @@ exclude = ["/test-exe"]
 thiserror = "2"
 
 [target."cfg(not(target_os = \"windows\"))".dependencies]
-dirs = "5.0.1"
+dirs = "6"
 
 [target.'cfg(windows)'.dependencies]
-windows-registry = "0.3.0"
-windows-result = "0.2.0"
+windows-registry = "0.5"
+windows-result = "0.3"
