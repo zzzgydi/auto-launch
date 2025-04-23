@@ -10,6 +10,7 @@ impl AutoLaunch {
     /// - `app_name`: application name
     /// - `app_path`: application path
     /// - `use_launch_agent`: whether use Launch Agent or AppleScript
+    /// - `agent_extra_config`: extra config for Launch Agent
     /// - `args`: startup args passed to the binary
     ///
     /// ## Notes
@@ -28,6 +29,7 @@ impl AutoLaunch {
         app_name: &str,
         app_path: &str,
         use_launch_agent: bool,
+        agent_extra_config: &str,
         args: &[impl AsRef<str>],
     ) -> AutoLaunch {
         let mut name = app_name;
@@ -47,6 +49,7 @@ impl AutoLaunch {
             app_name: name.into(),
             app_path: app_path.into(),
             use_launch_agent,
+            agent_extra_config: agent_extra_config.into(),
             args: args.iter().map(|s| s.as_ref().to_string()).collect(),
         }
     }
@@ -102,12 +105,14 @@ impl AutoLaunch {
                 <array>{}</array>\n  \
                 <key>RunAtLoad</key>\n  \
                 <true/>\n  \
+                {}\n  \
             </dict>\n\
             </plist>",
                 r#"<?xml version="1.0" encoding="UTF-8"?>"#,
                 r#"<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">"#,
                 self.app_name,
-                section
+                section,
+                self.agent_extra_config
             );
             fs::File::create(self.get_file())?.write(data.as_bytes())?;
         } else {
