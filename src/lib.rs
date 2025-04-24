@@ -282,9 +282,9 @@ pub struct AutoLaunchBuilder {
 
     pub app_path: Option<String>,
 
-    pub bundle_identifiers: Option<Vec<String>>,
-
     pub use_launch_agent: bool,
+
+    pub bundle_identifiers: Option<Vec<String>>,
 
     pub agent_extra_config: Option<String>,
 
