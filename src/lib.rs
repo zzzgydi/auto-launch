@@ -199,6 +199,7 @@ pub struct AutoLaunch {
     pub(crate) args: Vec<String>,
 
     #[cfg(target_os = "macos")]
+    /// Bundle identifiers
     pub(crate) bundle_identifiers: Vec<String>,
 
     #[cfg(target_os = "macos")]
