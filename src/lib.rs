@@ -199,12 +199,12 @@ pub struct AutoLaunch {
     pub(crate) args: Vec<String>,
 
     #[cfg(target_os = "macos")]
-    /// Bundle identifiers
-    pub(crate) bundle_identifiers: Vec<String>,
-
-    #[cfg(target_os = "macos")]
     /// Whether use Launch Agent for implement or use AppleScript
     pub(crate) use_launch_agent: bool,
+
+    #[cfg(target_os = "macos")]
+    /// Bundle identifiers
+    pub(crate) bundle_identifiers: Vec<String>,
 
     #[cfg(target_os = "macos")]
     /// Extra config in plist file for Launch Agent
