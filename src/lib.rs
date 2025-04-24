@@ -199,6 +199,9 @@ pub struct AutoLaunch {
     pub(crate) args: Vec<String>,
 
     #[cfg(target_os = "macos")]
+    pub(crate) bundle_identifiers: Vec<String>,
+
+    #[cfg(target_os = "macos")]
     /// Whether use Launch Agent for implement or use AppleScript
     pub(crate) use_launch_agent: bool,
 
@@ -278,6 +281,8 @@ pub struct AutoLaunchBuilder {
 
     pub app_path: Option<String>,
 
+    pub bundle_identifiers: Option<Vec<String>>,
+
     pub use_launch_agent: bool,
 
     pub agent_extra_config: Option<String>,
@@ -329,6 +334,18 @@ impl AutoLaunchBuilder {
         self
     }
 
+    /// Set the `bundle_identifiers`
+    /// This setting only works on macOS
+    pub fn set_bundle_identifiers(&mut self, bundle_identifiers: &[impl AsRef<str>]) -> &mut Self {
+        self.bundle_identifiers = Some(
+            bundle_identifiers
+                .iter()
+                .map(|s| s.as_ref().to_string())
+                .collect(),
+        );
+        self
+    }
+
     /// Set the `agent_extra_config`
     /// This setting only works on macOS
     pub fn set_agent_extra_config(&mut self, config: &str) -> &mut Self {
@@ -360,6 +377,7 @@ impl AutoLaunchBuilder {
         let app_name = self.app_name.as_ref().ok_or(Error::AppNameNotSpecified)?;
         let app_path = self.app_path.as_ref().ok_or(Error::AppPathNotSpecified)?;
         let args = self.args.clone().unwrap_or_default();
+        let bundle_identifiers = self.bundle_identifiers.clone().unwrap_or_default();
         let agent_extra_config = self.agent_extra_config.as_ref().map_or("", |v| v);
 
         #[cfg(target_os = "linux")]
@@ -369,8 +387,9 @@ impl AutoLaunchBuilder {
             app_name,
             app_path,
             self.use_launch_agent,
-            agent_extra_config,
             &args,
+            &bundle_identifiers,
+            agent_extra_config,
         ));
         #[cfg(target_os = "windows")]
         return Ok(AutoLaunch::new(

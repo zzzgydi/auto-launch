@@ -10,8 +10,9 @@ impl AutoLaunch {
     /// - `app_name`: application name
     /// - `app_path`: application path
     /// - `use_launch_agent`: whether use Launch Agent or AppleScript
-    /// - `agent_extra_config`: extra config for Launch Agent
     /// - `args`: startup args passed to the binary
+    /// - `bundle_identifiers`: bundle identifiers
+    /// - `agent_extra_config`: extra config for Launch Agent
     ///
     /// ## Notes
     ///
@@ -29,8 +30,9 @@ impl AutoLaunch {
         app_name: &str,
         app_path: &str,
         use_launch_agent: bool,
-        agent_extra_config: &str,
         args: &[impl AsRef<str>],
+        bundle_identifiers: &[impl AsRef<str>],
+        agent_extra_config: &str,
     ) -> AutoLaunch {
         let mut name = app_name;
         if !use_launch_agent {
@@ -49,8 +51,12 @@ impl AutoLaunch {
             app_name: name.into(),
             app_path: app_path.into(),
             use_launch_agent,
-            agent_extra_config: agent_extra_config.into(),
             args: args.iter().map(|s| s.as_ref().to_string()).collect(),
+            bundle_identifiers: bundle_identifiers
+                .iter()
+                .map(|s| s.as_ref().to_string())
+                .collect(),
+            agent_extra_config: agent_extra_config.into(),
         }
     }
 
@@ -95,24 +101,39 @@ impl AutoLaunch {
                 .map(|x| format!("<string>{}</string>", x))
                 .collect::<String>();
 
+            let identifiers = self
+                .bundle_identifiers
+                .iter()
+                .map(|x| format!("<string>{}</string>", x))
+                .collect::<String>();
+
+            let extra_config = if self.agent_extra_config.len() > 0 {
+                format!("{}\n  ", self.agent_extra_config)
+            } else {
+                "".to_string()
+            };
+
             let data = format!(
                 "{}\n{}\n\
             <plist version=\"1.0\">\n  \
             <dict>\n  \
                 <key>Label</key>\n  \
                 <string>{}</string>\n  \
+                <key>AssociatedBundleIdentifiers</key>\n  \
+                <array>{}</array>\n  \
                 <key>ProgramArguments</key>\n  \
                 <array>{}</array>\n  \
                 <key>RunAtLoad</key>\n  \
                 <true/>\n  \
-                {}\n  \
+                {}\
             </dict>\n\
             </plist>",
                 r#"<?xml version="1.0" encoding="UTF-8"?>"#,
                 r#"<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">"#,
                 self.app_name,
+                identifiers,
                 section,
-                self.agent_extra_config
+                extra_config
             );
             fs::File::create(self.get_file())?.write(data.as_bytes())?;
         } else {
