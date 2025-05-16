@@ -202,6 +202,14 @@ pub struct AutoLaunch {
     /// Whether use Launch Agent for implement or use AppleScript
     pub(crate) use_launch_agent: bool,
 
+    #[cfg(target_os = "macos")]
+    /// Bundle identifiers
+    pub(crate) bundle_identifiers: Vec<String>,
+
+    #[cfg(target_os = "macos")]
+    /// Extra config in plist file for Launch Agent
+    pub(crate) agent_extra_config: String,
+
     #[cfg(windows)]
     pub(crate) enable_mode: WindowsEnableMode,
 }
@@ -276,6 +284,10 @@ pub struct AutoLaunchBuilder {
 
     pub use_launch_agent: bool,
 
+    pub bundle_identifiers: Option<Vec<String>>,
+
+    pub agent_extra_config: Option<String>,
+
     pub windows_enable_mode: WindowsEnableMode,
 
     pub args: Option<Vec<String>>,
@@ -323,6 +335,25 @@ impl AutoLaunchBuilder {
         self
     }
 
+    /// Set the `bundle_identifiers`
+    /// This setting only works on macOS
+    pub fn set_bundle_identifiers(&mut self, bundle_identifiers: &[impl AsRef<str>]) -> &mut Self {
+        self.bundle_identifiers = Some(
+            bundle_identifiers
+                .iter()
+                .map(|s| s.as_ref().to_string())
+                .collect(),
+        );
+        self
+    }
+
+    /// Set the `agent_extra_config`
+    /// This setting only works on macOS
+    pub fn set_agent_extra_config(&mut self, config: &str) -> &mut Self {
+        self.agent_extra_config = Some(config.into());
+        self
+    }
+
     /// Set the [`WindowsEnableMode`].
     /// This setting only works on Windows
     pub fn set_windows_enable_mode(&mut self, mode: WindowsEnableMode) -> &mut Self {
@@ -347,6 +378,8 @@ impl AutoLaunchBuilder {
         let app_name = self.app_name.as_ref().ok_or(Error::AppNameNotSpecified)?;
         let app_path = self.app_path.as_ref().ok_or(Error::AppPathNotSpecified)?;
         let args = self.args.clone().unwrap_or_default();
+        let bundle_identifiers = self.bundle_identifiers.clone().unwrap_or_default();
+        let agent_extra_config = self.agent_extra_config.as_ref().map_or("", |v| v);
 
         #[cfg(target_os = "linux")]
         return Ok(AutoLaunch::new(app_name, app_path, &args));
@@ -356,6 +389,8 @@ impl AutoLaunchBuilder {
             app_path,
             self.use_launch_agent,
             &args,
+            &bundle_identifiers,
+            agent_extra_config,
         ));
         #[cfg(target_os = "windows")]
         return Ok(AutoLaunch::new(

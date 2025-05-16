@@ -191,16 +191,17 @@ mod macos_unit_test {
         let name_1 = "AutoLaunchTest"; // different name
         let name_2 = "auto-launch-test"; // same name
 
+        let bundle_identifiers = &["com.github.auto-launch-test"];
         let args = &["--minimized", "--hidden"];
         let app_path = get_test_bin("auto-launch-test");
         let app_path = app_path.as_str();
 
         // applescript
-        let auto1 = AutoLaunch::new(name_1, app_path, false, args);
-        let auto2 = AutoLaunch::new(name_2, app_path, false, args);
+        let auto1 = AutoLaunch::new(name_1, app_path, false, args, bundle_identifiers, "");
+        let auto2 = AutoLaunch::new(name_2, app_path, false, args, bundle_identifiers, "");
         // launch agent
-        let auto3 = AutoLaunch::new(name_1, app_path, true, args);
-        let auto4 = AutoLaunch::new(name_2, app_path, true, args);
+        let auto3 = AutoLaunch::new(name_1, app_path, true, args, bundle_identifiers, "");
+        let auto4 = AutoLaunch::new(name_2, app_path, true, args, bundle_identifiers, "");
 
         // app_name will be revised
         assert_eq!(auto1.get_app_name(), name_2);
@@ -214,6 +215,7 @@ mod macos_unit_test {
     fn test_macos_main() {
         let app_name = "auto-launch-test";
         let app_path = get_test_bin("auto-launch-test");
+        let bundle_identifiers = &["com.github.auto-launch-test"];
         let args = &["--minimized", "--hidden"];
         let app_path = app_path.as_str();
 
@@ -222,27 +224,34 @@ mod macos_unit_test {
         let app_path_not = "/Applications/Calculator1.app";
 
         // use applescript
-        let auto1 = AutoLaunch::new(app_name, app_path, false, args);
+        let auto1 = AutoLaunch::new(app_name, app_path, false, args, bundle_identifiers, "");
         assert_eq!(auto1.get_app_name(), app_name);
         auto1.enable().unwrap();
         assert!(auto1.is_enabled().unwrap());
         auto1.disable().unwrap();
         assert!(!auto1.is_enabled().unwrap());
 
-        let auto2 = AutoLaunch::new(app_name_not, app_path_not, false, args);
+        let auto2 = AutoLaunch::new(
+            app_name_not,
+            app_path_not,
+            false,
+            args,
+            bundle_identifiers,
+            "",
+        );
         assert_eq!(auto2.get_app_name(), app_name_not);
         assert!(auto2.enable().is_err());
         assert!(!auto2.is_enabled().unwrap());
 
         // use launch agent
-        let auto1 = AutoLaunch::new(app_name, app_path, true, args);
+        let auto1 = AutoLaunch::new(app_name, app_path, true, args, bundle_identifiers, "");
         assert_eq!(auto1.get_app_name(), app_name);
         auto1.enable().unwrap();
         assert!(auto1.is_enabled().unwrap());
         auto1.disable().unwrap();
         assert!(!auto1.is_enabled().unwrap());
 
-        let auto2 = AutoLaunch::new(app_name, app_path_not, true, args);
+        let auto2 = AutoLaunch::new(app_name, app_path_not, true, args, bundle_identifiers, "");
         assert_eq!(auto2.get_app_name(), app_name); // will not change the name
         assert!(auto2.enable().is_err());
         assert!(!auto2.is_enabled().unwrap());
@@ -269,6 +278,8 @@ mod macos_unit_test {
             .set_app_path(app_path)
             .set_use_launch_agent(true)
             .set_args(args)
+            .set_bundle_identifiers(bundle_identifiers)
+            .set_agent_extra_config("")
             .build()
             .unwrap();
 
