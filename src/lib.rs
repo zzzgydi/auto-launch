@@ -47,7 +47,8 @@
 //!     let app_name = "the-app";
 //!     let app_path = "/path/to/the-app.app";
 //!     let args = &["--minimized"];
-//!     let auto = AutoLaunch::new(app_name, app_path, false, args);
+//!     let bundle_identifiers = &["com.github.auto-launch-test"];
+//!     let auto = AutoLaunch::new(app_name, app_path, false, args, bundle_identifiers, "");
 //!
 //!     // enable the auto launch
 //!     auto.enable().is_ok();
@@ -170,7 +171,8 @@ mod windows;
 /// # let app_path = "/path/to/the-app";
 /// # let use_launch_agent = false;
 /// # let args = &["--minimized"];
-/// AutoLaunch::new(app_name, app_path, use_launch_agent, args);
+/// # let bundle_identifiers = &["com.github.auto-launch-test"];
+/// AutoLaunch::new(app_name, app_path, use_launch_agent, args, bundle_identifiers, "");
 /// # }
 /// ```
 ///
