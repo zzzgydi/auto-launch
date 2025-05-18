@@ -1,6 +1,9 @@
 #[cfg(test)]
 mod unit_test {
+    #[cfg(not(target_os = "macos"))]
     use auto_launch::{AutoLaunch, AutoLaunchBuilder};
+    #[cfg(target_os = "macos")]
+    use auto_launch::AutoLaunch;
     use std::env::current_dir;
 
     pub fn get_test_bin(name: &str) -> String {
