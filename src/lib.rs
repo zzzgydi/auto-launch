@@ -131,6 +131,10 @@ pub enum Error {
     AppPathIsNotAbsolute(std::path::PathBuf),
     #[error("Failed to execute apple script with status: {0}")]
     AppleScriptFailed(i32),
+    #[error("Failed to register app with SMAppService with status: {0}")]
+    SMAppServiceRegistrationFailed(u32),
+    #[error("Failed to unregister app with SMAppService with status: {0}")]
+    SMAppServiceUnregistrationFailed(u32),
     #[error("Unsupported target os")]
     UnsupportedOS,
     #[error(transparent)]
@@ -319,6 +323,8 @@ pub enum MacosEnableMode {
     LaunchAgent,
     /// Use AppleScript to enable the auto launch.
     AppleScript,
+    /// User SMAppService API to enable the auto launch.
+    SMAppService,
 }
 
 impl Default for MacosEnableMode {
@@ -391,8 +397,34 @@ impl AutoLaunchBuilder {
     /// - `app_path` is none
     /// - Unsupported target OS
     pub fn build(&self) -> Result<AutoLaunch> {
-        let app_name = self.app_name.as_ref().ok_or(Error::AppNameNotSpecified)?;
-        let app_path = self.app_path.as_ref().ok_or(Error::AppPathNotSpecified)?;
+        let default_str = String::new();
+        /*
+         * When SMAppService is used, app_name and app_path are ignored. This
+         * is because the SMAppService API is used to register the running app.
+         *
+         * We also need to check whether the os version is compatible with SMAppService.
+         */
+        let (app_name, app_path) = if self.macos_enable_mode == MacosEnableMode::SMAppService {
+            let info = os_info::get();
+            match info.version() {
+                os_info::Version::Semantic(major, _, _) => {
+                    if *major < 13 {
+                        return Err(Error::UnsupportedOS);
+                    }
+                },
+                _ => return Err(Error::UnsupportedOS),
+            };
+
+            (
+                self.app_name.as_ref().unwrap_or(&default_str),
+                self.app_path.as_ref().unwrap_or(&default_str),
+            )
+        } else {
+            (
+                self.app_name.as_ref().ok_or(Error::AppNameNotSpecified)?,
+                self.app_path.as_ref().ok_or(Error::AppPathNotSpecified)?,
+            )
+        };
         let args = self.args.clone().unwrap_or_default();
         let bundle_identifiers = self.bundle_identifiers.clone().unwrap_or_default();
         let agent_extra_config = self.agent_extra_config.as_ref().map_or("", |v| v);

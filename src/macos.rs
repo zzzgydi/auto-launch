@@ -1,4 +1,5 @@
 use crate::{AutoLaunch, Error, MacosEnableMode, Result};
+use smappservice_rs::{AppService, ServiceStatus, ServiceType};
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -77,6 +78,14 @@ impl AutoLaunch {
     ///
     /// - failed to execute the `osascript` command, check the exit status or stderr for details
     pub fn enable(&self) -> Result<()> {
+        if self.enable_mode == MacosEnableMode::SMAppService {
+            let app_service = AppService::new(ServiceType::MainApp);
+            match app_service.register() {
+                Ok(()) => return Ok(()),
+                Err(e) => return Err(Error::SMAppServiceRegistrationFailed(e.code())),
+            }
+        }
+
         let path = Path::new(&self.app_path);
 
         if !path.exists() {
@@ -169,35 +178,51 @@ impl AutoLaunch {
     ///
     /// - failed to execute the `osascript` command, check the exit status or stderr for details
     pub fn disable(&self) -> Result<()> {
-        if self.enable_mode == MacosEnableMode::LaunchAgent {
-            let file = self.get_file();
-            if file.exists() {
-                fs::remove_file(file)?;
+        match self.enable_mode {
+            MacosEnableMode::LaunchAgent => {
+                let file = self.get_file();
+                if file.exists() {
+                    fs::remove_file(file)?;
+                }
             }
-        } else {
-            let command = format!("delete login item \"{}\"", self.app_name);
-            let output = exec_apple_script(&command)?;
-            if !output.status.success() {
-                return Err(Error::AppleScriptFailed(output.status.code().unwrap_or(1)));
+            MacosEnableMode::AppleScript => {
+                let command = format!("delete login item \"{}\"", self.app_name);
+                let output = exec_apple_script(&command)?;
+                if !output.status.success() {
+                    return Err(Error::AppleScriptFailed(output.status.code().unwrap_or(1)));
+                }
+            }
+            MacosEnableMode::SMAppService => {
+                let app_service = AppService::new(ServiceType::MainApp);
+                match app_service.unregister() {
+                    Ok(()) => return Ok(()),
+                    Err(e) => return Err(Error::SMAppServiceUnregistrationFailed(e.code())),
+                }
             }
         }
+
         Ok(())
     }
 
     /// Check whether the AutoLaunch setting is enabled
     pub fn is_enabled(&self) -> Result<bool> {
-        if self.enable_mode == MacosEnableMode::LaunchAgent {
-            Ok(self.get_file().exists())
-        } else {
-            let command = "get the name of every login item";
-            let output = exec_apple_script(command)?;
-            let mut enable = false;
-            if output.status.success() {
-                let stdout = std::str::from_utf8(&output.stdout).unwrap_or("");
-                let mut stdout = stdout.split(",").map(|x| x.trim());
-                enable = stdout.find(|x| x == &self.app_name).is_some();
+        match self.enable_mode {
+            MacosEnableMode::LaunchAgent => Ok(self.get_file().exists()),
+            MacosEnableMode::AppleScript => {
+                let command = "get the name of every login item";
+                let output = exec_apple_script(command)?;
+                let mut enable = false;
+                if output.status.success() {
+                    let stdout = std::str::from_utf8(&output.stdout).unwrap_or("");
+                    let mut stdout = stdout.split(",").map(|x| x.trim());
+                    enable = stdout.find(|x| x == &self.app_name).is_some();
+                }
+                Ok(enable)
             }
-            Ok(enable)
+            MacosEnableMode::SMAppService => {
+                let app_service = AppService::new(ServiceType::MainApp);
+                Ok(app_service.status() == ServiceStatus::Enabled)
+            }
         }
     }
 
