@@ -1,4 +1,4 @@
-use crate::{AutoLaunch, Error, Result};
+use crate::{AutoLaunch, Error, MacosEnableMode, Result};
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -29,13 +29,13 @@ impl AutoLaunch {
     pub fn new(
         app_name: &str,
         app_path: &str,
-        use_launch_agent: bool,
+        enable_mode: MacosEnableMode,
         args: &[impl AsRef<str>],
         bundle_identifiers: &[impl AsRef<str>],
         agent_extra_config: &str,
     ) -> AutoLaunch {
         let mut name = app_name;
-        if !use_launch_agent {
+        if enable_mode == MacosEnableMode::AppleScript {
             // the app_name should be same as the executable's name
             // when using login item
             let end = if app_path.ends_with(".app") { 4 } else { 0 };
@@ -50,7 +50,7 @@ impl AutoLaunch {
         AutoLaunch {
             app_name: name.into(),
             app_path: app_path.into(),
-            use_launch_agent,
+            enable_mode,
             args: args.iter().map(|s| s.as_ref().to_string()).collect(),
             bundle_identifiers: bundle_identifiers
                 .iter()
@@ -87,7 +87,7 @@ impl AutoLaunch {
             return Err(Error::AppPathIsNotAbsolute(path.to_path_buf()));
         }
 
-        if self.use_launch_agent {
+        if self.enable_mode == MacosEnableMode::LaunchAgent {
             let dir = get_dir();
             if !dir.exists() {
                 fs::create_dir(&dir)?;
@@ -169,7 +169,7 @@ impl AutoLaunch {
     ///
     /// - failed to execute the `osascript` command, check the exit status or stderr for details
     pub fn disable(&self) -> Result<()> {
-        if self.use_launch_agent {
+        if self.enable_mode == MacosEnableMode::LaunchAgent {
             let file = self.get_file();
             if file.exists() {
                 fs::remove_file(file)?;
@@ -186,7 +186,7 @@ impl AutoLaunch {
 
     /// Check whether the AutoLaunch setting is enabled
     pub fn is_enabled(&self) -> Result<bool> {
-        if self.use_launch_agent {
+        if self.enable_mode == MacosEnableMode::LaunchAgent {
             Ok(self.get_file().exists())
         } else {
             let command = "get the name of every login item";

@@ -41,14 +41,14 @@
 //! ```rust
 //! # #[cfg(target_os = "macos")]
 //! # mod macos {
-//! use auto_launch::AutoLaunch;
+//! use auto_launch::{AutoLaunch, MacosEnableMode};
 //!
 //! fn main() {
 //!     let app_name = "the-app";
 //!     let app_path = "/path/to/the-app.app";
 //!     let args = &["--minimized"];
 //!     let bundle_identifiers = &["com.github.auto-launch-test"];
-//!     let auto = AutoLaunch::new(app_name, app_path, false, args, bundle_identifiers, "");
+//!     let auto = AutoLaunch::new(app_name, app_path, MacosEnableMode::AppleScript, args, bundle_identifiers, "");
 //!
 //!     // enable the auto launch
 //!     auto.enable().is_ok();
@@ -105,7 +105,7 @@
 //!     let auto = AutoLaunchBuilder::new()
 //!         .set_app_name("the-app")
 //!         .set_app_path("/path/to/the-app")
-//!         .set_use_launch_agent(true)
+//!         .set_macos_enable_mode(MacosEnableMode::LaunchAgent)
 //!         .set_args(&["--minimized"])
 //!         .build()
 //!         .unwrap();
@@ -166,13 +166,13 @@ mod windows;
 /// ```rust
 /// # #[cfg(target_os = "macos")]
 /// # {
-/// # use auto_launch::AutoLaunch;
+/// # use auto_launch::{AutoLaunch, MacosEnableMode};
 /// # let app_name = "the-app";
 /// # let app_path = "/path/to/the-app";
-/// # let use_launch_agent = false;
+/// # let enable_mode = MacosEnableMode::AppleScript;
 /// # let args = &["--minimized"];
 /// # let bundle_identifiers = &["com.github.auto-launch-test"];
-/// AutoLaunch::new(app_name, app_path, use_launch_agent, args, bundle_identifiers, "");
+/// AutoLaunch::new(app_name, app_path, enable_mode, args, bundle_identifiers, "");
 /// # }
 /// ```
 ///
@@ -201,8 +201,7 @@ pub struct AutoLaunch {
     pub(crate) args: Vec<String>,
 
     #[cfg(target_os = "macos")]
-    /// Whether use Launch Agent for implement or use AppleScript
-    pub(crate) use_launch_agent: bool,
+    pub(crate) enable_mode: MacosEnableMode,
 
     #[cfg(target_os = "macos")]
     /// Bundle identifiers
@@ -267,7 +266,7 @@ impl AutoLaunch {
 ///     let auto = AutoLaunchBuilder::new()
 ///         .set_app_name("the-app")
 ///         .set_app_path("/path/to/the-app")
-///         .set_use_launch_agent(true)
+///         .set_macos_enable_mode(MacosEnableMode::LaunchAgent)
 ///         .set_args(&["--minimized"])
 ///         .build()
 ///         .unwrap();
@@ -284,7 +283,7 @@ pub struct AutoLaunchBuilder {
 
     pub app_path: Option<String>,
 
-    pub use_launch_agent: bool,
+    pub macos_enable_mode: MacosEnableMode,
 
     pub bundle_identifiers: Option<Vec<String>>,
 
@@ -313,6 +312,21 @@ impl Default for WindowsEnableMode {
     }
 }
 
+/// Determines how the auto launch is enabled on macOS.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MacosEnableMode {
+    /// Use Launch Agent to enable the auto launch.
+    LaunchAgent,
+    /// Use AppleScript to enable the auto launch.
+    AppleScript,
+}
+
+impl Default for MacosEnableMode {
+    fn default() -> Self {
+        Self::LaunchAgent
+    }
+}
+
 impl AutoLaunchBuilder {
     pub fn new() -> AutoLaunchBuilder {
         AutoLaunchBuilder::default()
@@ -330,10 +344,10 @@ impl AutoLaunchBuilder {
         self
     }
 
-    /// Set the `use_launch_agent`
+    /// Set the [`MacosEnableMode`].
     /// This setting only works on macOS
-    pub fn set_use_launch_agent(&mut self, use_launch_agent: bool) -> &mut Self {
-        self.use_launch_agent = use_launch_agent;
+    pub fn set_macos_enable_mode(&mut self, mode: MacosEnableMode) -> &mut Self {
+        self.macos_enable_mode = mode;
         self
     }
 
@@ -389,7 +403,7 @@ impl AutoLaunchBuilder {
         return Ok(AutoLaunch::new(
             app_name,
             app_path,
-            self.use_launch_agent,
+            self.macos_enable_mode,
             &args,
             &bundle_identifiers,
             agent_extra_config,
