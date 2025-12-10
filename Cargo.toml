@@ -11,11 +11,11 @@ description = "Auto launch any application or executable at startup. Supports Wi
 exclude = ["/test-exe"]
 
 [dependencies]
-thiserror = "2"
+thiserror = "^2"
 
 [target."cfg(not(target_os = \"windows\"))".dependencies]
-dirs = "6"
+dirs = "^6"
 
 [target.'cfg(windows)'.dependencies]
-windows-registry = "0.5"
-windows-result = "0.3"
+windows-registry = "^0.6"
+windows-result = "^0.4"
