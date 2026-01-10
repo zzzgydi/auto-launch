@@ -191,3 +191,26 @@ fn last_eight_bytes_all_zeros(bytes: &[u8]) -> std::result::Result<bool, &str> {
         Ok(bytes.iter().rev().take(8).all(|v| *v == 0u8))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::last_eight_bytes_all_zeros;
+
+    #[test]
+    fn test_last_eight_bytes_all_zeros_true() {
+        let data = [1u8, 2, 3, 4, 5, 0, 0, 0, 0, 0, 0, 0, 0];
+        assert_eq!(last_eight_bytes_all_zeros(&data).unwrap(), true);
+    }
+
+    #[test]
+    fn test_last_eight_bytes_all_zeros_false() {
+        let data = [0u8, 0, 0, 0, 0, 0, 0, 1];
+        assert_eq!(last_eight_bytes_all_zeros(&data).unwrap(), false);
+    }
+
+    #[test]
+    fn test_last_eight_bytes_all_zeros_too_short() {
+        let data = [0u8, 0, 0, 0, 0, 0, 0];
+        assert!(last_eight_bytes_all_zeros(&data).is_err());
+    }
+}

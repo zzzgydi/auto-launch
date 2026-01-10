@@ -118,47 +118,12 @@ impl AutoLaunch {
             fs::create_dir(&dir)?;
         }
 
-        let mut args = vec![self.app_path.clone()];
-        args.extend_from_slice(&self.args);
-
-        let section = args
-            .iter()
-            .map(|x| format!("<string>{}</string>", x))
-            .collect::<String>();
-
-        let identifiers = self
-            .bundle_identifiers
-            .iter()
-            .map(|x| format!("<string>{}</string>", x))
-            .collect::<String>();
-
-        let extra_config = if !self.agent_extra_config.is_empty() {
-            format!("{}\n  ", self.agent_extra_config)
-        } else {
-            "".to_string()
-        };
-
-        let data = format!(
-            "{}\n{}\n\
-        <plist version=\"1.0\">\n  \
-        <dict>\n  \
-            <key>Label</key>\n  \
-            <string>{}</string>\n  \
-            <key>AssociatedBundleIdentifiers</key>\n  \
-            <array>{}</array>\n  \
-            <key>ProgramArguments</key>\n  \
-            <array>{}</array>\n  \
-            <key>RunAtLoad</key>\n  \
-            <true/>\n  \
-            {}\
-        </dict>\n\
-        </plist>",
-            r#"<?xml version="1.0" encoding="UTF-8"?>"#,
-            r#"<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">"#,
-            self.app_name,
-            identifiers,
-            section,
-            extra_config
+        let data = build_launch_agent_plist(
+            &self.app_name,
+            &self.app_path,
+            &self.args,
+            &self.bundle_identifiers,
+            &self.agent_extra_config,
         );
         let _ = fs::File::create(self.get_file()?)?.write(data.as_bytes())?;
         Ok(())
@@ -292,4 +257,80 @@ fn exec_apple_script(cmd_suffix: &str) -> Result<Output> {
         .args(vec!["-e", &command])
         .output()?;
     Ok(output)
+}
+
+fn build_launch_agent_plist(
+    app_name: &str,
+    app_path: &str,
+    args: &[String],
+    bundle_identifiers: &[String],
+    agent_extra_config: &str,
+) -> String {
+    let mut full_args = vec![app_path.to_string()];
+    full_args.extend_from_slice(args);
+
+    let section = full_args
+        .iter()
+        .map(|x| format!("<string>{}</string>", x))
+        .collect::<String>();
+
+    let identifiers = bundle_identifiers
+        .iter()
+        .map(|x| format!("<string>{}</string>", x))
+        .collect::<String>();
+
+    let extra_config = if !agent_extra_config.is_empty() {
+        format!("{}\n  ", agent_extra_config)
+    } else {
+        String::new()
+    };
+
+    format!(
+        "{}\n{}\n\
+        <plist version=\"1.0\">\n  \
+        <dict>\n  \
+            <key>Label</key>\n  \
+            <string>{}</string>\n  \
+            <key>AssociatedBundleIdentifiers</key>\n  \
+            <array>{}</array>\n  \
+            <key>ProgramArguments</key>\n  \
+            <array>{}</array>\n  \
+            <key>RunAtLoad</key>\n  \
+            <true/>\n  \
+            {}\
+        </dict>\n\
+        </plist>",
+        r#"<?xml version="1.0" encoding="UTF-8"?>"#,
+        r#"<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">"#,
+        app_name,
+        identifiers,
+        section,
+        extra_config
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_build_launch_agent_plist() {
+        let data = build_launch_agent_plist(
+            "TestApp",
+            "/Applications/TestApp.app",
+            &vec!["--flag".into()],
+            &vec!["com.example.testapp".into()],
+            "<key>KeepAlive</key><true/>",
+        );
+
+        assert!(data.contains("<key>Label</key>"));
+        assert!(data.contains("<string>TestApp</string>"));
+        assert!(data.contains("<key>AssociatedBundleIdentifiers</key>"));
+        assert!(data.contains("<string>com.example.testapp</string>"));
+        assert!(data.contains("<key>ProgramArguments</key>"));
+        assert!(data.contains("<string>/Applications/TestApp.app</string>"));
+        assert!(data.contains("<string>--flag</string>"));
+        assert!(data.contains("<key>RunAtLoad</key>"));
+        assert!(data.contains("<key>KeepAlive</key><true/>"));
+    }
 }

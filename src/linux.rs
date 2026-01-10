@@ -43,20 +43,7 @@ impl AutoLaunch {
 
     /// Enable using XDG Autostart (.desktop file)
     fn enable_xdg_autostart(&self) -> Result<()> {
-        let data = format!(
-            "[Desktop Entry]\n\
-            Type=Application\n\
-            Version=1.0\n\
-            Name={}\n\
-            Comment={} startup script\n\
-            Exec={} {}\n\
-            StartupNotify=false\n\
-            Terminal=false",
-            self.app_name,
-            self.app_name,
-            self.app_path,
-            self.args.join(" ")
-        );
+        let data = build_xdg_autostart_data(&self.app_name, &self.app_path, &self.args);
 
         let dir = get_xdg_autostart_dir()?;
         if !dir.exists() {
@@ -81,27 +68,7 @@ impl AutoLaunch {
     /// Enable using systemd user service
     fn enable_systemd(&self) -> Result<()> {
         // Create systemd service file content
-        let args_str = if self.args.is_empty() {
-            String::new()
-        } else {
-            format!(" {}", self.args.join(" "))
-        };
-
-        let data = format!(
-            "[Unit]\n\
-            Description={}\n\
-            After=default.target\n\
-            \n\
-            [Service]\n\
-            Type=simple\n\
-            ExecStart={}{}\n\
-            Restart=on-failure\n\
-            RestartSec=10\n\
-            \n\
-            [Install]\n\
-            WantedBy=default.target",
-            self.app_name, self.app_path, args_str
-        );
+        let data = build_systemd_service_data(&self.app_name, &self.app_path, &self.args);
 
         // Create systemd user directory
         let dir = get_systemd_user_dir()?;
@@ -247,6 +214,47 @@ impl AutoLaunch {
     }
 }
 
+fn build_xdg_autostart_data(app_name: &str, app_path: &str, args: &[String]) -> String {
+    format!(
+        "[Desktop Entry]\n\
+        Type=Application\n\
+        Version=1.0\n\
+        Name={}\n\
+        Comment={} startup script\n\
+        Exec={} {}\n\
+        StartupNotify=false\n\
+        Terminal=false",
+        app_name,
+        app_name,
+        app_path,
+        args.join(" ")
+    )
+}
+
+fn build_systemd_service_data(app_name: &str, app_path: &str, args: &[String]) -> String {
+    let args_str = if args.is_empty() {
+        String::new()
+    } else {
+        format!(" {}", args.join(" "))
+    };
+
+    format!(
+        "[Unit]\n\
+        Description={}\n\
+        After=default.target\n\
+        \n\
+        [Service]\n\
+        Type=simple\n\
+        ExecStart={}{}\n\
+        Restart=on-failure\n\
+        RestartSec=10\n\
+        \n\
+        [Install]\n\
+        WantedBy=default.target",
+        app_name, app_path, args_str
+    )
+}
+
 /// Get the XDG autostart directory
 fn get_xdg_autostart_dir() -> Result<PathBuf> {
     let home_dir = dirs::home_dir().ok_or_else(|| {
@@ -261,4 +269,40 @@ fn get_systemd_user_dir() -> Result<PathBuf> {
         std::io::Error::new(std::io::ErrorKind::NotFound, "Failed to find home directory")
     })?;
     Ok(home_dir.join(".config").join("systemd").join("user"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_build_xdg_autostart_data() {
+        let data = build_xdg_autostart_data(
+            "TestApp",
+            "/opt/test-app",
+            &vec!["--flag".into(), "value".into()],
+        );
+
+        assert!(data.contains("Type=Application"));
+        assert!(data.contains("Name=TestApp"));
+        assert!(data.contains("Comment=TestApp startup script"));
+        assert!(data.contains("Exec=/opt/test-app --flag value"));
+        assert!(data.contains("StartupNotify=false"));
+        assert!(data.contains("Terminal=false"));
+    }
+
+    #[test]
+    fn test_build_systemd_service_data() {
+        let data = build_systemd_service_data(
+            "TestApp",
+            "/opt/test-app",
+            &vec!["--flag".into()],
+        );
+
+        assert!(data.contains("Description=TestApp"));
+        assert!(data.contains("After=default.target"));
+        assert!(data.contains("ExecStart=/opt/test-app --flag"));
+        assert!(data.contains("Restart=on-failure"));
+        assert!(data.contains("WantedBy=default.target"));
+    }
 }
