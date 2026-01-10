@@ -457,7 +457,7 @@ impl AutoLaunchBuilder {
                     if *major < 13 {
                         return Err(Error::UnsupportedOS);
                     }
-                },
+                }
                 _ => return Err(Error::UnsupportedOS),
             };
 

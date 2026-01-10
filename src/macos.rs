@@ -113,7 +113,7 @@ impl AutoLaunch {
 
     /// Enable using Launch Agent
     fn enable_launch_agent(&self) -> Result<()> {
-        let dir = get_dir();
+        let dir = get_dir()?;
         if !dir.exists() {
             fs::create_dir(&dir)?;
         }
@@ -160,7 +160,7 @@ impl AutoLaunch {
             section,
             extra_config
         );
-        let _ = fs::File::create(self.get_file())?.write(data.as_bytes())?;
+        let _ = fs::File::create(self.get_file()?)?.write(data.as_bytes())?;
         Ok(())
     }
 
@@ -218,7 +218,7 @@ impl AutoLaunch {
 
     /// Disable Launch Agent
     fn disable_launch_agent(&self) -> Result<()> {
-        let file = self.get_file();
+        let file = self.get_file()?;
         if file.exists() {
             fs::remove_file(file)?;
         }
@@ -243,7 +243,7 @@ impl AutoLaunch {
     /// - Check if the app is registered with SMAppService
     pub fn is_enabled(&self) -> Result<bool> {
         match self.launch_mode {
-            MacOSLaunchMode::LaunchAgent => Ok(self.get_file().exists()),
+            MacOSLaunchMode::LaunchAgent => Ok(self.get_file()?.exists()),
             MacOSLaunchMode::AppleScript => self.is_applescript_enabled(),
             MacOSLaunchMode::SMAppService => self.is_smappservice_enabled(),
         }
@@ -272,17 +272,17 @@ impl AutoLaunch {
     }
 
     /// get the plist file path
-    fn get_file(&self) -> PathBuf {
-        get_dir().join(format!("{}.plist", self.app_name))
+    fn get_file(&self) -> Result<PathBuf> {
+        Ok(get_dir()?.join(format!("{}.plist", self.app_name)))
     }
 }
 
 /// Get the Launch Agent Dir
-fn get_dir() -> PathBuf {
-    dirs::home_dir()
-        .unwrap()
-        .join("Library")
-        .join("LaunchAgents")
+fn get_dir() -> Result<PathBuf> {
+    let home_dir = dirs::home_dir().ok_or_else(|| {
+        std::io::Error::new(std::io::ErrorKind::NotFound, "Failed to find home directory")
+    })?;
+    Ok(home_dir.join("Library").join("LaunchAgents"))
 }
 
 /// Execute the specific AppleScript

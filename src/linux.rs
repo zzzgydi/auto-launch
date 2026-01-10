@@ -58,7 +58,7 @@ impl AutoLaunch {
             self.args.join(" ")
         );
 
-        let dir = get_xdg_autostart_dir();
+        let dir = get_xdg_autostart_dir()?;
         if !dir.exists() {
             fs::create_dir_all(&dir).or_else(|e| {
                 if e.kind() == std::io::ErrorKind::AlreadyExists {
@@ -68,7 +68,7 @@ impl AutoLaunch {
                 }
             })?;
         }
-        let file_path = self.get_xdg_desktop_file();
+        let file_path = self.get_xdg_desktop_file()?;
         let mut file = fs::OpenOptions::new()
             .write(true)
             .create(true)
@@ -104,7 +104,7 @@ impl AutoLaunch {
         );
 
         // Create systemd user directory
-        let dir = get_systemd_user_dir();
+        let dir = get_systemd_user_dir()?;
         if !dir.exists() {
             fs::create_dir_all(&dir).or_else(|e| {
                 if e.kind() == std::io::ErrorKind::AlreadyExists {
@@ -116,7 +116,7 @@ impl AutoLaunch {
         }
 
         // Write service file
-        let service_file = self.get_systemd_service_file();
+        let service_file = self.get_systemd_service_file()?;
         let mut file = fs::OpenOptions::new()
             .write(true)
             .create(true)
@@ -166,7 +166,7 @@ impl AutoLaunch {
 
     /// Disable XDG Autostart
     fn disable_xdg_autostart(&self) -> Result<()> {
-        let file = self.get_xdg_desktop_file();
+        let file = self.get_xdg_desktop_file()?;
         if file.exists() {
             fs::remove_file(file)?;
         }
@@ -179,7 +179,7 @@ impl AutoLaunch {
         self.systemctl_disable()?;
 
         // Remove service file
-        let service_file = self.get_systemd_service_file();
+        let service_file = self.get_systemd_service_file()?;
         if service_file.exists() {
             fs::remove_file(service_file)?;
         }
@@ -217,7 +217,7 @@ impl AutoLaunch {
     /// Check whether the AutoLaunch setting is enabled
     pub fn is_enabled(&self) -> Result<bool> {
         match self.launch_mode {
-            LinuxLaunchMode::XdgAutostart => Ok(self.get_xdg_desktop_file().exists()),
+            LinuxLaunchMode::XdgAutostart => Ok(self.get_xdg_desktop_file()?.exists()),
             LinuxLaunchMode::Systemd => self.is_systemd_enabled(),
         }
     }
@@ -237,26 +237,28 @@ impl AutoLaunch {
     }
 
     /// Get the XDG desktop entry file path
-    fn get_xdg_desktop_file(&self) -> PathBuf {
-        get_xdg_autostart_dir().join(format!("{}.desktop", self.app_name))
+    fn get_xdg_desktop_file(&self) -> Result<PathBuf> {
+        Ok(get_xdg_autostart_dir()?.join(format!("{}.desktop", self.app_name)))
     }
 
     /// Get the systemd service file path
-    fn get_systemd_service_file(&self) -> PathBuf {
-        get_systemd_user_dir().join(format!("{}.service", self.app_name))
+    fn get_systemd_service_file(&self) -> Result<PathBuf> {
+        Ok(get_systemd_user_dir()?.join(format!("{}.service", self.app_name)))
     }
 }
 
 /// Get the XDG autostart directory
-fn get_xdg_autostart_dir() -> PathBuf {
-    dirs::home_dir().unwrap().join(".config").join("autostart")
+fn get_xdg_autostart_dir() -> Result<PathBuf> {
+    let home_dir = dirs::home_dir().ok_or_else(|| {
+        std::io::Error::new(std::io::ErrorKind::NotFound, "Failed to find home directory")
+    })?;
+    Ok(home_dir.join(".config").join("autostart"))
 }
 
 /// Get the systemd user service directory
-fn get_systemd_user_dir() -> PathBuf {
-    dirs::home_dir()
-        .unwrap()
-        .join(".config")
-        .join("systemd")
-        .join("user")
+fn get_systemd_user_dir() -> Result<PathBuf> {
+    let home_dir = dirs::home_dir().ok_or_else(|| {
+        std::io::Error::new(std::io::ErrorKind::NotFound, "Failed to find home directory")
+    })?;
+    Ok(home_dir.join(".config").join("systemd").join("user"))
 }
