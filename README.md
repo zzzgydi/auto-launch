@@ -24,7 +24,7 @@ fn main() {
     let auto = AutoLaunchBuilder::new()
         .set_app_name("the-app")
         .set_app_path("/path/to/the-app")
-        .set_use_launch_agent(true)
+        .set_macos_launch_mode(MacOSLaunchMode::LaunchAgent)
         .build()
         .unwrap();
 
@@ -38,13 +38,22 @@ fn main() {
 
 ### Linux
 
+Linux supports two ways to achieve auto launch:
+- **XDG Autostart**: Uses `.desktop` files in `~/.config/autostart/` (default)
+- **systemd**: Uses systemd user services in `~/.config/systemd/user/`
+
 ```rust
-use auto_launch::AutoLaunch;
+use auto_launch::{AutoLaunch, LinuxLaunchMode};
 
 fn main() {
     let app_name = "the-app";
     let app_path = "/path/to/the-app";
-    let auto = AutoLaunch::new(app_name, app_path, &[] as &[&str]);
+    
+    // Use XDG Autostart (default method)
+    let auto = AutoLaunch::new(app_name, app_path, LinuxLaunchMode::XdgAutostart, &[] as &[&str]);
+    
+    // Or use systemd user service
+    // let auto = AutoLaunch::new(app_name, app_path, LinuxLaunchMode::Systemd, &[] as &[&str]);
 
     // enable the auto launch
     auto.enable().is_ok();
@@ -58,8 +67,9 @@ fn main() {
 
 ### macOS
 
-macOS supports two ways to achieve auto launch (via AppleScript or Launch Agent).
-When the `use_launch_agent` is true, it will achieve by Launch Agent, otherwise by AppleScript.
+macOS supports two ways to achieve auto launch:
+- **Launch Agent**: Uses plist files in `~/Library/LaunchAgents/` (default)
+- **AppleScript**: Uses AppleScript to add login items
 
 **Note**:
 
@@ -68,12 +78,17 @@ When the `use_launch_agent` is true, it will achieve by Launch Agent, otherwise 
 - In case using AppleScript, only `--hidden` and `--minimized` in `args` are valid, which means that hide the app on launch.
 
 ```rust
-use auto_launch::AutoLaunch;
+use auto_launch::{AutoLaunch, MacOSLaunchMode};
 
 fn main() {
     let app_name = "the-app";
     let app_path = "/path/to/the-app.app";
-    let auto = AutoLaunch::new(app_name, app_path, false, &[] as &[&str]);
+    
+    // Use Launch Agent (default method)
+    let auto = AutoLaunch::new(app_name, app_path, MacOSLaunchMode::LaunchAgent, &[] as &[&str], &[] as &[&str], "");
+    
+    // Or use AppleScript
+    // let auto = AutoLaunch::new(app_name, app_path, MacOSLaunchMode::AppleScript, &[] as &[&str], &[] as &[&str], "");
 
     // enable the auto launch
     auto.enable().is_ok();

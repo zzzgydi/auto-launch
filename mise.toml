@@ -1,0 +1,25 @@
+[tasks.test]
+depends = ["build", "build-exe"]
+run = "cargo test"
+
+[tasks.ci]
+depends = ["lint", "test"]
+
+[tasks.lint]
+run = [
+  "cargo fmt --check",
+  "cargo clippy --all-targets --all-features -- -D warnings",
+]
+
+[tasks.lint-fix]
+run = [
+  "cargo fmt --all",
+  "cargo clippy --fix --allow-dirty --allow-staged --all-targets --all-features --allow-no-vcs -- -D warnings",
+]
+
+[tasks.build]
+run = "cargo build"
+
+[tasks.build-exe]
+run = "cargo build --release"
+dir = "test-exe"

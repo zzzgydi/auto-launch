@@ -10,13 +10,14 @@
 //! ```rust
 //! # #[cfg(target_os = "linux")]
 //! # mod linux {
-//! use auto_launch::AutoLaunch;
+//! use auto_launch::{AutoLaunch, LinuxLaunchMode};
 //!
 //! fn main() {
 //!     let app_name = "the-app";
 //!     let app_path = "/path/to/the-app";
 //!     let args = &["--minimized"];
-//!     let auto = AutoLaunch::new(app_name, app_path, args);
+//!     // Use XDG Autostart by default, or use LinuxLaunchMode::Systemd for systemd
+//!     let auto = AutoLaunch::new(app_name, app_path, LinuxLaunchMode::XdgAutostart, args);
 //!
 //!     // enable the auto launch
 //!     auto.enable().is_ok();
@@ -31,24 +32,27 @@
 //!
 //! ### macOS
 //!
-//! macOS supports two ways to achieve auto launch (via AppleScript or Launch Agent).
-//! When the `use_launch_agent` is true, it will achieve by Launch Agent, otherwise by AppleScript.
+//! macOS supports two ways to achieve auto launch:
+//! - **Launch Agent**: Uses plist files in `~/Library/LaunchAgents/` (default)
+//! - **AppleScript**: Uses AppleScript to add login items
 //!
 //! **Note**:
 //! - The `app_path` should be a absolute path and exists. Otherwise, it will cause an error when `enable`.
 //! - In case using AppleScript, the `app_name` should be same as the basename of `app_path`, or it will be corrected automatically.
+//! - In case using AppleScript, only `--hidden` and `--minimized` in `args` are valid, which means that hide the app on launch.
 //!
 //! ```rust
 //! # #[cfg(target_os = "macos")]
 //! # mod macos {
-//! use auto_launch::AutoLaunch;
+//! use auto_launch::{AutoLaunch, MacOSLaunchMode};
 //!
 //! fn main() {
 //!     let app_name = "the-app";
 //!     let app_path = "/path/to/the-app.app";
 //!     let args = &["--minimized"];
 //!     let bundle_identifiers = &["com.github.auto-launch-test"];
-//!     let auto = AutoLaunch::new(app_name, app_path, false, args, bundle_identifiers, "");
+//!     // Use Launch Agent by default, or use MacOSLaunchMode::AppleScript
+//!     let auto = AutoLaunch::new(app_name, app_path, MacOSLaunchMode::LaunchAgent, args, bundle_identifiers, "");
 //!
 //!     // enable the auto launch
 //!     auto.enable().is_ok();
@@ -68,7 +72,7 @@
 //!
 //! By default we try to apply the auto launch to the system registry, which requires admin privileges and applies the auto launch to any user in the system.
 //! If there's no permission to do so, we fallback to enabling it to the current user only.
-//! To change this behavior, you can use [`AutoLaunch::set_windows_enable_mode`].
+//! To change this behavior, specify the [`WindowsEnableMode`] when creating the [`AutoLaunch`] instance.
 //!
 //! ```rust
 //! # #[cfg(target_os = "windows")]
@@ -101,21 +105,21 @@
 //! ```rust
 //! use auto_launch::*;
 //!
-//! fn main() {
-//!     let auto = AutoLaunchBuilder::new()
-//!         .set_app_name("the-app")
-//!         .set_app_path("/path/to/the-app")
-//!         .set_use_launch_agent(true)
-//!         .set_args(&["--minimized"])
-//!         .build()
-//!         .unwrap();
+//! # fn example() -> std::result::Result<(), Box<dyn std::error::Error>> {
+//! let auto = AutoLaunchBuilder::new()
+//!     .set_app_name("the-app")
+//!     .set_app_path("/path/to/the-app")
+//!     .set_macos_launch_mode(MacOSLaunchMode::LaunchAgent)
+//!     .set_args(&["--minimized"])
+//!     .build()?;
 //!
-//!     auto.enable().is_ok();
-//!     auto.is_enabled().unwrap();
+//! auto.enable()?;
+//! auto.is_enabled()?;
 //!
-//!     auto.disable().is_ok();
-//!     auto.is_enabled().unwrap();
-//! }
+//! auto.disable()?;
+//! auto.is_enabled()?;
+//! # Ok(())
+//! # }
 //! ```
 //!
 
@@ -153,11 +157,12 @@ mod windows;
 /// ```rust
 /// # #[cfg(target_os = "linux")]
 /// # {
-/// # use auto_launch::AutoLaunch;
+/// # use auto_launch::{AutoLaunch, LinuxLaunchMode};
 /// # let app_name = "the-app";
 /// # let app_path = "/path/to/the-app";
+/// # let launch_mode = LinuxLaunchMode::XdgAutostart;
 /// # let args = &["--minimized"];
-/// AutoLaunch::new(app_name, app_path, args);
+/// AutoLaunch::new(app_name, app_path, launch_mode, args);
 /// # }
 /// ```
 ///
@@ -166,13 +171,13 @@ mod windows;
 /// ```rust
 /// # #[cfg(target_os = "macos")]
 /// # {
-/// # use auto_launch::AutoLaunch;
+/// # use auto_launch::{AutoLaunch, MacOSLaunchMode};
 /// # let app_name = "the-app";
 /// # let app_path = "/path/to/the-app";
-/// # let use_launch_agent = false;
+/// # let launch_mode = MacOSLaunchMode::LaunchAgent;
 /// # let args = &["--minimized"];
 /// # let bundle_identifiers = &["com.github.auto-launch-test"];
-/// AutoLaunch::new(app_name, app_path, use_launch_agent, args, bundle_identifiers, "");
+/// AutoLaunch::new(app_name, app_path, launch_mode, args, bundle_identifiers, "");
 /// # }
 /// ```
 ///
@@ -200,9 +205,13 @@ pub struct AutoLaunch {
     /// Args passed to the binary on startup
     pub(crate) args: Vec<String>,
 
+    #[cfg(target_os = "linux")]
+    /// Launch mode for Linux (XDG Autostart or systemd)
+    pub(crate) launch_mode: LinuxLaunchMode,
+
     #[cfg(target_os = "macos")]
-    /// Whether use Launch Agent for implement or use AppleScript
-    pub(crate) use_launch_agent: bool,
+    /// Launch mode for macOS (Launch Agent or AppleScript)
+    pub(crate) launch_mode: MacOSLaunchMode,
 
     #[cfg(target_os = "macos")]
     /// Bundle identifiers
@@ -263,28 +272,28 @@ impl AutoLaunch {
 /// ```rust
 /// use auto_launch::*;
 ///
-/// fn main() {
-///     let auto = AutoLaunchBuilder::new()
-///         .set_app_name("the-app")
-///         .set_app_path("/path/to/the-app")
-///         .set_use_launch_agent(true)
-///         .set_args(&["--minimized"])
-///         .build()
-///         .unwrap();
+/// # fn example() -> std::result::Result<(), Box<dyn std::error::Error>> {
+/// let auto = AutoLaunchBuilder::new()
+///     .set_app_name("the-app")
+///     .set_app_path("/path/to/the-app")
+///     .set_macos_launch_mode(MacOSLaunchMode::LaunchAgent)
+///     .set_args(&["--minimized"])
+///     .build()?;
 ///
-///     auto.enable().is_ok();
-///     auto.is_enabled().unwrap();
+/// auto.enable()?;
+/// auto.is_enabled()?;
 ///
-///     auto.disable().is_ok();
-///     auto.is_enabled().unwrap();
-/// }
+/// auto.disable()?;
+/// auto.is_enabled()?;
+/// # Ok(())
+/// # }
 /// ```
 pub struct AutoLaunchBuilder {
     pub app_name: Option<String>,
 
     pub app_path: Option<String>,
 
-    pub use_launch_agent: bool,
+    pub macos_launch_mode: MacOSLaunchMode,
 
     pub bundle_identifiers: Option<Vec<String>>,
 
@@ -292,7 +301,39 @@ pub struct AutoLaunchBuilder {
 
     pub windows_enable_mode: WindowsEnableMode,
 
+    pub linux_launch_mode: LinuxLaunchMode,
+
     pub args: Option<Vec<String>>,
+}
+
+/// Determines how the auto launch is enabled on Linux.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LinuxLaunchMode {
+    /// Use XDG Autostart (.desktop file in ~/.config/autostart/)
+    XdgAutostart,
+    /// Use systemd user service (~/.config/systemd/user/)
+    Systemd,
+}
+
+impl Default for LinuxLaunchMode {
+    fn default() -> Self {
+        Self::XdgAutostart
+    }
+}
+
+/// Determines how the auto launch is enabled on macOS.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MacOSLaunchMode {
+    /// Use Launch Agent (plist file in ~/Library/LaunchAgents/)
+    LaunchAgent,
+    /// Use AppleScript to add login item
+    AppleScript,
+}
+
+impl Default for MacOSLaunchMode {
+    fn default() -> Self {
+        Self::LaunchAgent
+    }
 }
 
 /// Determines how the auto launch is enabled on Windows.
@@ -330,10 +371,22 @@ impl AutoLaunchBuilder {
         self
     }
 
-    /// Set the `use_launch_agent`
+    /// Set the [`MacOSLaunchMode`].
     /// This setting only works on macOS
+    pub fn set_macos_launch_mode(&mut self, mode: MacOSLaunchMode) -> &mut Self {
+        self.macos_launch_mode = mode;
+        self
+    }
+
+    /// Set the `use_launch_agent` (deprecated: use `set_macos_launch_mode` instead)
+    /// This setting only works on macOS
+    #[deprecated(since = "0.6.0", note = "Use `set_macos_launch_mode` instead")]
     pub fn set_use_launch_agent(&mut self, use_launch_agent: bool) -> &mut Self {
-        self.use_launch_agent = use_launch_agent;
+        self.macos_launch_mode = if use_launch_agent {
+            MacOSLaunchMode::LaunchAgent
+        } else {
+            MacOSLaunchMode::AppleScript
+        };
         self
     }
 
@@ -363,6 +416,13 @@ impl AutoLaunchBuilder {
         self
     }
 
+    /// Set the [`LinuxLaunchMode`].
+    /// This setting only works on Linux
+    pub fn set_linux_launch_mode(&mut self, mode: LinuxLaunchMode) -> &mut Self {
+        self.linux_launch_mode = mode;
+        self
+    }
+
     /// Set the args
     pub fn set_args(&mut self, args: &[impl AsRef<str>]) -> &mut Self {
         self.args = Some(args.iter().map(|s| s.as_ref().to_string()).collect());
@@ -384,12 +444,17 @@ impl AutoLaunchBuilder {
         let agent_extra_config = self.agent_extra_config.as_ref().map_or("", |v| v);
 
         #[cfg(target_os = "linux")]
-        return Ok(AutoLaunch::new(app_name, app_path, &args));
+        return Ok(AutoLaunch::new(
+            app_name,
+            app_path,
+            self.linux_launch_mode,
+            &args,
+        ));
         #[cfg(target_os = "macos")]
         return Ok(AutoLaunch::new(
             app_name,
             app_path,
-            self.use_launch_agent,
+            self.macos_launch_mode,
             &args,
             &bundle_identifiers,
             agent_extra_config,
