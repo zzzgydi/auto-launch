@@ -187,7 +187,7 @@ mod windows_unit_test {
 #[cfg(test)]
 mod macos_unit_test {
     use crate::unit_test::*;
-    use auto_launch::{AutoLaunch, AutoLaunchBuilder};
+    use auto_launch::{AutoLaunch, AutoLaunchBuilder, MacOSLaunchMode};
 
     #[test]
     fn test_macos_new() {
@@ -313,6 +313,14 @@ mod macos_unit_test {
         assert!(!auto2.is_enabled().unwrap());
         auto2.disable().unwrap();
         assert!(!auto2.is_enabled().unwrap());
+
+        // Use SMAppService
+        let auto3 = AutoLaunch::new(app_name, app_path, MacOSLaunchMode::SMAppService, args, bundle_identifiers, "");
+        assert_eq!(auto3.get_app_name(), app_name);
+        auto3.enable().unwrap();
+        assert!(auto3.is_enabled().unwrap());
+        auto3.disable().unwrap();
+        assert!(!auto3.is_enabled().unwrap());
 
         // test builder
         let auto = AutoLaunchBuilder::new()
