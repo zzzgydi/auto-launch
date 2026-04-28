@@ -222,7 +222,7 @@ mod macos_unit_test {
         let auto3 = AutoLaunch::new(
             name_1,
             app_path,
-            MacOSLaunchMode::LaunchAgent,
+            MacOSLaunchMode::LaunchAgentUser,
             args,
             bundle_identifiers,
             "",
@@ -230,7 +230,7 @@ mod macos_unit_test {
         let auto4 = AutoLaunch::new(
             name_2,
             app_path,
-            MacOSLaunchMode::LaunchAgent,
+            MacOSLaunchMode::LaunchAgentUser,
             args,
             bundle_identifiers,
             "",
@@ -289,7 +289,7 @@ mod macos_unit_test {
         let auto1 = AutoLaunch::new(
             app_name,
             app_path,
-            MacOSLaunchMode::LaunchAgent,
+            MacOSLaunchMode::LaunchAgentUser,
             args,
             bundle_identifiers,
             "",
@@ -303,7 +303,7 @@ mod macos_unit_test {
         let auto2 = AutoLaunch::new(
             app_name,
             app_path_not,
-            MacOSLaunchMode::LaunchAgent,
+            MacOSLaunchMode::LaunchAgentUser,
             args,
             bundle_identifiers,
             "",
@@ -347,7 +347,7 @@ mod macos_unit_test {
         let auto = AutoLaunchBuilder::new()
             .set_app_name(app_name)
             .set_app_path(app_path)
-            .set_macos_launch_mode(MacOSLaunchMode::LaunchAgent)
+            .set_macos_launch_mode(MacOSLaunchMode::LaunchAgentUser)
             .set_args(args)
             .set_bundle_identifiers(bundle_identifiers)
             .set_agent_extra_config("")
@@ -387,7 +387,7 @@ mod linux_unit_test {
         assert!(!auto1.is_enabled().unwrap());
 
         // test systemd mode
-        let auto2 = AutoLaunch::new(app_name, app_path, LinuxLaunchMode::Systemd, args);
+        let auto2 = AutoLaunch::new(app_name, app_path, LinuxLaunchMode::SystemdUser, args);
 
         assert_eq!(auto2.get_app_name(), app_name);
         // Note: systemd tests may require systemctl to be available

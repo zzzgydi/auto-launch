@@ -105,7 +105,9 @@ impl AutoLaunch {
         }
 
         match self.launch_mode {
-            MacOSLaunchMode::LaunchAgent => self.enable_launch_agent(),
+            MacOSLaunchMode::LaunchAgentUser | MacOSLaunchMode::LaunchAgentSystem => {
+                self.enable_launch_agent()
+            }
             MacOSLaunchMode::AppleScript => self.enable_applescript(),
             MacOSLaunchMode::SMAppService => unreachable!("SMAppService mode handled above"),
         }
@@ -113,9 +115,9 @@ impl AutoLaunch {
 
     /// Enable using Launch Agent
     fn enable_launch_agent(&self) -> Result<()> {
-        let dir = get_dir()?;
+        let dir = get_dir(self.launch_mode)?;
         if !dir.exists() {
-            fs::create_dir(&dir)?;
+            fs::create_dir_all(&dir)?;
         }
 
         let data = build_launch_agent_plist(
@@ -166,7 +168,9 @@ impl AutoLaunch {
     /// - failed to unregister app with SMAppService API (macOS 13+)
     pub fn disable(&self) -> Result<()> {
         match self.launch_mode {
-            MacOSLaunchMode::LaunchAgent => self.disable_launch_agent(),
+            MacOSLaunchMode::LaunchAgentUser | MacOSLaunchMode::LaunchAgentSystem => {
+                self.disable_launch_agent()
+            }
             MacOSLaunchMode::AppleScript => self.disable_applescript(),
             MacOSLaunchMode::SMAppService => self.disable_smappservice(),
         }
@@ -208,7 +212,9 @@ impl AutoLaunch {
     /// - Check if the app is registered with SMAppService
     pub fn is_enabled(&self) -> Result<bool> {
         match self.launch_mode {
-            MacOSLaunchMode::LaunchAgent => Ok(self.get_file()?.exists()),
+            MacOSLaunchMode::LaunchAgentUser | MacOSLaunchMode::LaunchAgentSystem => {
+                Ok(self.get_file()?.exists())
+            }
             MacOSLaunchMode::AppleScript => self.is_applescript_enabled(),
             MacOSLaunchMode::SMAppService => self.is_smappservice_enabled(),
         }
@@ -238,16 +244,27 @@ impl AutoLaunch {
 
     /// get the plist file path
     fn get_file(&self) -> Result<PathBuf> {
-        Ok(get_dir()?.join(format!("{}.plist", self.app_name)))
+        Ok(get_dir(self.launch_mode)?.join(format!("{}.plist", self.app_name)))
     }
 }
 
-/// Get the Launch Agent Dir
-fn get_dir() -> Result<PathBuf> {
-    let home_dir = dirs::home_dir().ok_or_else(|| {
-        std::io::Error::new(std::io::ErrorKind::NotFound, "Failed to find home directory")
-    })?;
-    Ok(home_dir.join("Library").join("LaunchAgents"))
+/// Get the Launch Agent Dir.
+fn get_dir(mode: MacOSLaunchMode) -> Result<PathBuf> {
+    match mode {
+        MacOSLaunchMode::LaunchAgentSystem => Ok(PathBuf::from("/Library/LaunchAgents")),
+        MacOSLaunchMode::LaunchAgentUser => {
+            let home_dir = dirs::home_dir().ok_or_else(|| {
+                std::io::Error::new(
+                    std::io::ErrorKind::NotFound,
+                    "Failed to find home directory",
+                )
+            })?;
+            Ok(home_dir.join("Library").join("LaunchAgents"))
+        }
+        MacOSLaunchMode::AppleScript | MacOSLaunchMode::SMAppService => {
+            unreachable!("mode does not use LaunchAgents dir")
+        }
+    }
 }
 
 /// Execute the specific AppleScript

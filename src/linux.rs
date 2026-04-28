@@ -37,7 +37,7 @@ impl AutoLaunch {
     pub fn enable(&self) -> Result<()> {
         match self.launch_mode {
             LinuxLaunchMode::XdgAutostart => self.enable_xdg_autostart(),
-            LinuxLaunchMode::Systemd => self.enable_systemd(),
+            LinuxLaunchMode::SystemdUser | LinuxLaunchMode::SystemdSystem => self.enable_systemd(),
         }
     }
 
@@ -65,13 +65,13 @@ impl AutoLaunch {
         Ok(())
     }
 
-    /// Enable using systemd user service
+    /// Enable using systemd service
     fn enable_systemd(&self) -> Result<()> {
         // Create systemd service file content
         let data = build_systemd_service_data(&self.app_name, &self.app_path, &self.args);
 
-        // Create systemd user directory
-        let dir = get_systemd_user_dir()?;
+        // Create systemd directory
+        let dir = get_systemd_dir(self.launch_mode)?;
         if !dir.exists() {
             fs::create_dir_all(&dir).or_else(|e| {
                 if e.kind() == std::io::ErrorKind::AlreadyExists {
@@ -97,11 +97,16 @@ impl AutoLaunch {
         Ok(())
     }
 
-    /// Run systemctl --user enable command
+    /// Run systemctl enable command.
     fn systemctl_enable(&self) -> Result<()> {
         let service_name = format!("{}.service", self.app_name);
+        let args: &[&str] = match self.launch_mode {
+            LinuxLaunchMode::SystemdUser => &["--user", "enable", &service_name],
+            LinuxLaunchMode::SystemdSystem => &["enable", &service_name],
+            LinuxLaunchMode::XdgAutostart => unreachable!("XDG mode does not use systemctl"),
+        };
         let output = std::process::Command::new("systemctl")
-            .args(&["--user", "enable", &service_name])
+            .args(args)
             .output()?;
 
         if !output.status.success() {
@@ -127,7 +132,7 @@ impl AutoLaunch {
     pub fn disable(&self) -> Result<()> {
         match self.launch_mode {
             LinuxLaunchMode::XdgAutostart => self.disable_xdg_autostart(),
-            LinuxLaunchMode::Systemd => self.disable_systemd(),
+            LinuxLaunchMode::SystemdUser | LinuxLaunchMode::SystemdSystem => self.disable_systemd(),
         }
     }
 
@@ -140,7 +145,7 @@ impl AutoLaunch {
         Ok(())
     }
 
-    /// Disable systemd user service
+    /// Disable systemd service
     fn disable_systemd(&self) -> Result<()> {
         // Disable the service
         self.systemctl_disable()?;
@@ -152,18 +157,28 @@ impl AutoLaunch {
         }
 
         // Reload systemd daemon
+        let daemon_reload_args: &[&str] = match self.launch_mode {
+            LinuxLaunchMode::SystemdUser => &["--user", "daemon-reload"],
+            LinuxLaunchMode::SystemdSystem => &["daemon-reload"],
+            LinuxLaunchMode::XdgAutostart => unreachable!("XDG mode does not use systemctl"),
+        };
         let _ = std::process::Command::new("systemctl")
-            .args(&["--user", "daemon-reload"])
+            .args(daemon_reload_args)
             .output();
 
         Ok(())
     }
 
-    /// Run systemctl --user disable command
+    /// Run systemctl disable command.
     fn systemctl_disable(&self) -> Result<()> {
         let service_name = format!("{}.service", self.app_name);
+        let args: &[&str] = match self.launch_mode {
+            LinuxLaunchMode::SystemdUser => &["--user", "disable", &service_name],
+            LinuxLaunchMode::SystemdSystem => &["disable", &service_name],
+            LinuxLaunchMode::XdgAutostart => unreachable!("XDG mode does not use systemctl"),
+        };
         let output = std::process::Command::new("systemctl")
-            .args(&["--user", "disable", &service_name])
+            .args(args)
             .output()?;
 
         // Don't fail if the service is not enabled
@@ -185,15 +200,22 @@ impl AutoLaunch {
     pub fn is_enabled(&self) -> Result<bool> {
         match self.launch_mode {
             LinuxLaunchMode::XdgAutostart => Ok(self.get_xdg_desktop_file()?.exists()),
-            LinuxLaunchMode::Systemd => self.is_systemd_enabled(),
+            LinuxLaunchMode::SystemdUser | LinuxLaunchMode::SystemdSystem => {
+                self.is_systemd_enabled()
+            }
         }
     }
 
     /// Check if systemd service is enabled
     fn is_systemd_enabled(&self) -> Result<bool> {
         let service_name = format!("{}.service", self.app_name);
+        let args: &[&str] = match self.launch_mode {
+            LinuxLaunchMode::SystemdUser => &["--user", "is-enabled", &service_name],
+            LinuxLaunchMode::SystemdSystem => &["is-enabled", &service_name],
+            LinuxLaunchMode::XdgAutostart => unreachable!("XDG mode does not use systemctl"),
+        };
         let output = std::process::Command::new("systemctl")
-            .args(&["--user", "is-enabled", &service_name])
+            .args(args)
             .output()?;
 
         // systemctl is-enabled returns:
@@ -210,7 +232,7 @@ impl AutoLaunch {
 
     /// Get the systemd service file path
     fn get_systemd_service_file(&self) -> Result<PathBuf> {
-        Ok(get_systemd_user_dir()?.join(format!("{}.service", self.app_name)))
+        Ok(get_systemd_dir(self.launch_mode)?.join(format!("{}.service", self.app_name)))
     }
 }
 
@@ -258,17 +280,29 @@ fn build_systemd_service_data(app_name: &str, app_path: &str, args: &[String]) -
 /// Get the XDG autostart directory
 fn get_xdg_autostart_dir() -> Result<PathBuf> {
     let home_dir = dirs::home_dir().ok_or_else(|| {
-        std::io::Error::new(std::io::ErrorKind::NotFound, "Failed to find home directory")
+        std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "Failed to find home directory",
+        )
     })?;
     Ok(home_dir.join(".config").join("autostart"))
 }
 
-/// Get the systemd user service directory
-fn get_systemd_user_dir() -> Result<PathBuf> {
-    let home_dir = dirs::home_dir().ok_or_else(|| {
-        std::io::Error::new(std::io::ErrorKind::NotFound, "Failed to find home directory")
-    })?;
-    Ok(home_dir.join(".config").join("systemd").join("user"))
+/// Get the systemd service directory.
+fn get_systemd_dir(mode: LinuxLaunchMode) -> Result<PathBuf> {
+    match mode {
+        LinuxLaunchMode::SystemdSystem => Ok(PathBuf::from("/etc/systemd/system")),
+        LinuxLaunchMode::SystemdUser => {
+            let home_dir = dirs::home_dir().ok_or_else(|| {
+                std::io::Error::new(
+                    std::io::ErrorKind::NotFound,
+                    "Failed to find home directory",
+                )
+            })?;
+            Ok(home_dir.join(".config").join("systemd").join("user"))
+        }
+        LinuxLaunchMode::XdgAutostart => unreachable!("XDG mode does not use systemd dir"),
+    }
 }
 
 #[cfg(test)]
@@ -293,11 +327,7 @@ mod tests {
 
     #[test]
     fn test_build_systemd_service_data() {
-        let data = build_systemd_service_data(
-            "TestApp",
-            "/opt/test-app",
-            &vec!["--flag".into()],
-        );
+        let data = build_systemd_service_data("TestApp", "/opt/test-app", &vec!["--flag".into()]);
 
         assert!(data.contains("Description=TestApp"));
         assert!(data.contains("After=default.target"));

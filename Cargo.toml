@@ -21,5 +21,8 @@ dirs = "^6"
 windows-registry = "^0.6"
 windows-result = "^0.4"
 
+[target.'cfg(unix)'.dependencies]
+nix = { version = "0.31", features = ["user"] }
+
 [target.'cfg(target_os = "macos")'.dependencies]
 smappservice-rs = "0.1"
