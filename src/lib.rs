@@ -147,7 +147,7 @@ pub enum Error {
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "freebsd"))]
 mod linux;
 #[cfg(target_os = "macos")]
 mod macos;
@@ -209,7 +209,7 @@ pub struct AutoLaunch {
     /// Args passed to the binary on startup
     pub(crate) args: Vec<String>,
 
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     /// Launch mode for Linux (XDG Autostart or systemd)
     pub(crate) launch_mode: LinuxLaunchMode,
 
@@ -242,6 +242,7 @@ impl AutoLaunch {
     pub fn is_support() -> bool {
         cfg!(any(
             target_os = "linux",
+            target_os = "freebsd",
             target_os = "macos",
             target_os = "windows",
         ))
@@ -475,7 +476,7 @@ impl AutoLaunchBuilder {
         let bundle_identifiers = self.bundle_identifiers.clone().unwrap_or_default();
         let agent_extra_config = self.agent_extra_config.as_ref().map_or("", |v| v);
 
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "freebsd"))]
         return Ok(AutoLaunch::new(
             app_name,
             app_path,
@@ -499,7 +500,7 @@ impl AutoLaunchBuilder {
             &args,
         ));
 
-        #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
+        #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux", target_os = "freebsd")))]
         return Err(Error::UnsupportedOS);
     }
 }
