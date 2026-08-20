@@ -306,6 +306,7 @@ pub struct AutoLaunchBuilder {
     #[cfg(target_os = "macos")]
     pub agent_extra_config: Option<String>,
 
+    #[cfg(windows)]
     pub windows_enable_mode: WindowsEnableMode,
 
     #[cfg(target_os = "linux")]
@@ -422,8 +423,12 @@ impl AutoLaunchBuilder {
 
     /// Set the [`WindowsEnableMode`].
     /// This setting only works on Windows
+    #[allow(unused_variables)]
     pub fn set_windows_enable_mode(&mut self, mode: WindowsEnableMode) -> &mut Self {
-        self.windows_enable_mode = mode;
+        #[cfg(windows)]
+        {
+            self.windows_enable_mode = mode;
+        }
         self
     }
 
