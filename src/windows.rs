@@ -9,7 +9,7 @@ const TASK_MANAGER_OVERRIDE_ENABLED_VALUE: [u8; 12] = [
     0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 ];
 const E_ACCESSDENIED: i32 = 0x80070005_u32 as _;
-const E_FILE_NOT_FOUND: i32 = 0x80070002_u32 as _;
+const ERROR_FILE_NOT_FOUND: i32 = 0x80070002_u32 as _;
 
 /// Windows implement
 impl AutoLaunch {
@@ -86,7 +86,7 @@ impl AutoLaunch {
                 windows_registry::Type::Bytes,
                 &TASK_MANAGER_OVERRIDE_ENABLED_VALUE,
             )?,
-            Err(error) if error.code().0 == E_FILE_NOT_FOUND => {
+            Err(error) if error.code().0 == ERROR_FILE_NOT_FOUND => {
                 return Ok(());
             }
             Err(error) => {
@@ -137,7 +137,7 @@ impl AutoLaunch {
             .and_then(|key| key.remove_value(&self.app_name))
         {
             Ok(_) => Ok(()),
-            Err(error) if error.code().0 == E_FILE_NOT_FOUND => Ok(()),
+            Err(error) if error.code().0 == ERROR_FILE_NOT_FOUND => Ok(()),
             Err(error) => Err(error),
         }
     }
@@ -160,7 +160,7 @@ impl AutoLaunch {
             .and_then(|key| key.get_string(&self.app_name))
         {
             Ok(_) => true,
-            Err(error) if error.code().0 == E_FILE_NOT_FOUND => false,
+            Err(error) if error.code().0 == ERROR_FILE_NOT_FOUND => false,
             Err(error) => {
                 return Err(error.into());
             }
@@ -174,7 +174,7 @@ impl AutoLaunch {
             .and_then(|key| key.get_value(&self.app_name))
         {
             Ok(value) => last_eight_bytes_all_zeros(&value).unwrap_or(true),
-            Err(error) if error.code().0 == E_FILE_NOT_FOUND => true,
+            Err(error) if error.code().0 == ERROR_FILE_NOT_FOUND => true,
             Err(error) => {
                 return Err(error.into());
             }
