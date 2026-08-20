@@ -147,7 +147,7 @@ pub enum Error {
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "freebsd"))]
 mod linux;
 #[cfg(target_os = "macos")]
 mod macos;
@@ -209,7 +209,7 @@ pub struct AutoLaunch {
     /// Args passed to the binary on startup
     pub(crate) args: Vec<String>,
 
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     /// Launch mode for Linux (XDG Autostart or systemd)
     pub(crate) launch_mode: LinuxLaunchMode,
 
@@ -242,6 +242,7 @@ impl AutoLaunch {
     pub fn is_support() -> bool {
         cfg!(any(
             target_os = "linux",
+            target_os = "freebsd",
             target_os = "macos",
             target_os = "windows",
         ))
@@ -309,7 +310,7 @@ pub struct AutoLaunchBuilder {
     #[cfg(windows)]
     pub windows_enable_mode: WindowsEnableMode,
 
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     pub linux_launch_mode: LinuxLaunchMode,
 
     pub args: Option<Vec<String>>,
@@ -436,7 +437,7 @@ impl AutoLaunchBuilder {
     /// This setting only works on Linux
     #[allow(unused_variables)]
     pub fn set_linux_launch_mode(&mut self, mode: LinuxLaunchMode) -> &mut Self {
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "freebsd"))]
         {
             self.linux_launch_mode = mode;
         }
@@ -457,7 +458,12 @@ impl AutoLaunchBuilder {
     /// - `app_path` is none
     /// - Unsupported target OS
     pub fn build(&self) -> Result<AutoLaunch> {
-        #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
+        #[cfg(not(any(
+            target_os = "macos",
+            target_os = "windows",
+            target_os = "linux",
+            target_os = "freebsd"
+        )))]
         return Err(Error::UnsupportedOS);
 
         let (app_name, app_path) = app_name_path(
@@ -468,7 +474,7 @@ impl AutoLaunchBuilder {
         )?;
         let args = self.args.clone().unwrap_or_default();
 
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "freebsd"))]
         return Ok(AutoLaunch::new(
             app_name,
             app_path,
