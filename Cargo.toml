@@ -12,7 +12,6 @@ exclude = ["/test-exe"]
 
 [dependencies]
 thiserror = "^2"
-os_info = { version = "3", default-features = false }
 
 [target."cfg(not(target_os = \"windows\"))".dependencies]
 dirs = "^6"
@@ -22,4 +21,5 @@ windows-registry = "^0.6"
 windows-result = "^0.4"
 
 [target.'cfg(target_os = "macos")'.dependencies]
+os_info = { version = "3", default-features = false }
 smappservice-rs = "0.1"
