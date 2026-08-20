@@ -450,7 +450,8 @@ impl AutoLaunchBuilder {
          *
          * We also need to check whether the os version is compatible with SMAppService.
          */
-        let (app_name, app_path) = if self.macos_launch_mode == MacOSLaunchMode::SMAppService {
+        let (app_name, app_path) =
+            if matches!(&self.macos_launch_mode, MacOSLaunchMode::SMAppService) {
             let info = os_info::get();
             match info.version() {
                 os_info::Version::Semantic(major, _, _) => {
