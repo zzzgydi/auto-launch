@@ -464,7 +464,7 @@ impl AutoLaunchBuilder {
             self.app_name.as_deref(),
             self.app_path.as_deref(),
             #[cfg(target_os = "macos")]
-            self.macos_launch_mode,
+            &self.macos_launch_mode,
         )?;
         let args = self.args.clone().unwrap_or_default();
 
@@ -506,7 +506,7 @@ fn app_name_path<'a>(
      * We also need to check whether the os version is compatible with SMAppService.
      */
     #[cfg(target_os = "macos")]
-    if self.macos_launch_mode == MacOSLaunchMode::SMAppService {
+    if macos_launch_mode == MacOSLaunchMode::SMAppService {
         let info = os_info::get();
         match info.version() {
             os_info::Version::Semantic(major, _, _) => {
