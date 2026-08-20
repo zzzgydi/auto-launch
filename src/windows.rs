@@ -74,7 +74,7 @@ impl AutoLaunch {
     fn enable_with_root_key(&self, root_key: &Key) -> windows_registry::Result<()> {
         root_key.create(AL_REGKEY)?.set_string(
             &self.app_name,
-            format!("{} {}", &self.app_path, &self.args.join(" ")),
+            format!("{} {}", self.app_path, self.args.join(" ")),
         )?;
 
         match root_key
