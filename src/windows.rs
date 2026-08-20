@@ -1,7 +1,6 @@
 use crate::{AutoLaunch, Result, WindowsEnableMode};
 use std::io;
 use windows_registry::{Key, CURRENT_USER, LOCAL_MACHINE};
-use windows_result::HRESULT;
 
 const AL_REGKEY: &str = r"SOFTWARE\Microsoft\Windows\CurrentVersion\Run";
 const TASK_MANAGER_OVERRIDE_REGKEY: &str =
@@ -9,8 +8,8 @@ const TASK_MANAGER_OVERRIDE_REGKEY: &str =
 const TASK_MANAGER_OVERRIDE_ENABLED_VALUE: [u8; 12] = [
     0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 ];
-const E_ACCESSDENIED: HRESULT = HRESULT::from_win32(0x80070005_u32);
-const E_FILENOTFOUND: HRESULT = HRESULT::from_win32(0x80070002_u32);
+const E_ACCESSDENIED: i32 = 0x80070005_u32 as _;
+const E_FILENOTFOUND: i32 = 0x80070002_u32 as _;
 
 /// Windows implement
 impl AutoLaunch {
@@ -48,7 +47,7 @@ impl AutoLaunch {
             WindowsEnableMode::Dynamic => self
                 .enable_as_admin()
                 .or_else(|e| {
-                    if e.code() == E_ACCESSDENIED {
+                    if e.code().0 == E_ACCESSDENIED {
                         self.enable_as_current_user()
                     } else {
                         Err(e)
@@ -87,7 +86,7 @@ impl AutoLaunch {
                 windows_registry::Type::Bytes,
                 &TASK_MANAGER_OVERRIDE_ENABLED_VALUE,
             )?,
-            Err(error) if error.code() == E_FILENOTFOUND => {
+            Err(error) if error.code().0 == E_FILENOTFOUND => {
                 return Ok(());
             }
             Err(error) => {
@@ -106,7 +105,7 @@ impl AutoLaunch {
     pub fn disable(&self) -> Result<()> {
         // try to delete both admin and current user registry values
         if let Err(error) = self.disable_as_admin() {
-            if error.code() == E_ACCESSDENIED {
+            if error.code().0 == E_ACCESSDENIED {
                 match self.enable_mode {
                     // Fail if our enable mode is system but we don't have the access
                     WindowsEnableMode::System => return Err(std::io::Error::from(error).into()),
@@ -138,7 +137,7 @@ impl AutoLaunch {
             .and_then(|key| key.remove_value(&self.app_name))
         {
             Ok(_) => Ok(()),
-            Err(error) if error.code() == E_FILENOTFOUND => Ok(()),
+            Err(error) if error.code().0 == E_FILENOTFOUND => Ok(()),
             Err(error) => Err(error),
         }
     }
@@ -161,7 +160,7 @@ impl AutoLaunch {
             .and_then(|key| key.get_string(&self.app_name))
         {
             Ok(_) => true,
-            Err(error) if error.code() == E_FILENOTFOUND => false,
+            Err(error) if error.code().0 == E_FILENOTFOUND => false,
             Err(error) => {
                 return Err(error.into());
             }
@@ -175,7 +174,7 @@ impl AutoLaunch {
             .and_then(|key| key.get_value(&self.app_name))
         {
             Ok(value) => last_eight_bytes_all_zeros(&value).unwrap_or(true),
-            Err(error) if error.code() == E_FILENOTFOUND => true,
+            Err(error) if error.code().0 == E_FILENOTFOUND => true,
             Err(error) => {
                 return Err(error.into());
             }

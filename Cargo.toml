@@ -18,8 +18,7 @@ os_info = { version = "3", default-features = false }
 dirs = "^6"
 
 [target.'cfg(windows)'.dependencies]
-windows-registry = "^0.6"
-windows-result = "^0.4"
+windows-registry = ">=0.5, <=0.6"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 smappservice-rs = "0.1"
