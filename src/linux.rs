@@ -235,8 +235,7 @@ fn build_xdg_autostart_data(app_name: &str, app_path: &str, args: &[String]) -> 
 }
 
 fn quote_xdg_exec_argument(arg: &str) -> String {
-    let quoted = arg.is_empty()
-        || arg.chars().any(|c| " \t\n\r\"'\\><~|&;$*?#()`".contains(c));
+    let quoted = arg.is_empty() || arg.chars().any(|c| " \t\n\r\"'\\><~|&;$*?#()`".contains(c));
     if !quoted {
         return arg.replace('%', "%%");
     }
