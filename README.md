@@ -139,6 +139,13 @@ fn main() {
 }
 ```
 
+## Tests
+
+On Linux and FreeBSD, `cargo test --test xdg_exec` uses GLib's `gio launch` to
+check that an XDG desktop entry starts the executable with its original arguments.
+Install the `gio` command before running this test. It uses a temporary home
+directory and removes its desktop entry afterwards.
+
 ## License
 
 MIT License. See the [License](./LICENSE) file for details.

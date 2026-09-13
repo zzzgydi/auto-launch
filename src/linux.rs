@@ -226,9 +226,40 @@ fn build_xdg_autostart_data(app_name: &str, app_path: &str, args: &[String]) -> 
         Terminal=false",
         app_name,
         app_name,
-        app_path,
-        args.join(" ")
+        quote_xdg_exec_argument(app_path),
+        args.iter()
+            .map(|arg| quote_xdg_exec_argument(arg))
+            .collect::<Vec<_>>()
+            .join(" ")
     )
+}
+
+fn quote_xdg_exec_argument(arg: &str) -> String {
+    let quoted = arg.is_empty()
+        || arg.chars().any(|c| " \t\n\r\"'\\><~|&;$*?#()`".contains(c));
+    if !quoted {
+        return arg.replace('%', "%%");
+    }
+
+    // Desktop Entry string escaping is decoded before Exec argument quoting.
+    // Escape both layers so paths and literal arguments survive the launcher.
+    let mut escaped = String::from("\"");
+    for c in arg.chars() {
+        match c {
+            '\\' => escaped.push_str("\\\\\\\\"),
+            '"' | '`' | '$' => {
+                escaped.push_str("\\\\");
+                escaped.push(c);
+            }
+            '\n' => escaped.push_str("\\n"),
+            '\t' => escaped.push_str("\\t"),
+            '\r' => escaped.push_str("\\r"),
+            '%' => escaped.push_str("%%"),
+            _ => escaped.push(c),
+        }
+    }
+    escaped.push('"');
+    escaped
 }
 
 fn build_systemd_service_data(app_name: &str, app_path: &str, args: &[String]) -> String {
@@ -289,6 +320,24 @@ mod tests {
         assert!(data.contains("Exec=/opt/test-app --flag value"));
         assert!(data.contains("StartupNotify=false"));
         assert!(data.contains("Terminal=false"));
+    }
+
+    #[test]
+    fn test_xdg_exec_quoting() {
+        for (input, expected) in [
+            ("", "\"\""),
+            ("--profile=work", "--profile=work"),
+            ("/opt/My App/app", "\"/opt/My App/app\""),
+            ("two words", "\"two words\""),
+            ("%f", "%%f"),
+            (
+                "line\nbreak\tand\rcarriage",
+                "\"line\\nbreak\\tand\\rcarriage\"",
+            ),
+            (r#"a"b\c$d`e"#, r#""a\\"b\\\\c\\$d\\`e""#),
+        ] {
+            assert_eq!(quote_xdg_exec_argument(input), expected, "{input:?}");
+        }
     }
 
     #[test]
