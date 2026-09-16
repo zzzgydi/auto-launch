@@ -14,6 +14,10 @@ exclude = ["/test-exe"]
 name = "xdg_exec"
 harness = false
 
+[[test]]
+name = "windows_exec"
+harness = false
+
 [dependencies]
 thiserror = "^2"
 
@@ -26,3 +30,6 @@ windows-registry = ">=0.5, <=0.6"
 [target.'cfg(target_os = "macos")'.dependencies]
 os_info = { version = "3", default-features = false }
 smappservice-rs = "0.1"
+
+[target.'cfg(windows)'.dev-dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security", "Win32_System_Threading"] }

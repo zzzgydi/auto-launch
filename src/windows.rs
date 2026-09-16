@@ -1,4 +1,4 @@
-use crate::{AutoLaunch, Result, WindowsEnableMode};
+use crate::{windows_command_line::build_command_line, AutoLaunch, Result, WindowsEnableMode};
 use std::io;
 use windows_registry::{Key, CURRENT_USER, LOCAL_MACHINE};
 
@@ -15,9 +15,9 @@ const ERROR_FILE_NOT_FOUND: i32 = 0x80070002_u32 as _;
 impl AutoLaunch {
     /// Create a new AutoLaunch instance
     /// - `app_name`: application name
-    /// - `app_path`: application path
+    /// - `app_path`: executable path (one surrounding quote pair is also accepted)
     /// - `enable_mode`: behavior of the enable feature
-    /// - `args`: startup args passed to the binary
+    /// - `args`: literal arguments, without command-line quoting
     ///
     /// ## Notes
     ///
@@ -40,41 +40,40 @@ impl AutoLaunch {
     ///
     /// ## Errors
     ///
+    /// - invalid executable path or an argument containing NUL
     /// - failed to open the registry key
     /// - failed to set value
     pub fn enable(&self) -> Result<()> {
+        let command_line = build_command_line(&self.app_path, &self.args)?;
         match self.enable_mode {
             WindowsEnableMode::Dynamic => self
-                .enable_as_admin()
+                .enable_with_root_key(LOCAL_MACHINE, &command_line)
                 .or_else(|e| {
                     if e.code().0 == E_ACCESSDENIED {
-                        self.enable_as_current_user()
+                        self.enable_with_root_key(CURRENT_USER, &command_line)
                     } else {
                         Err(e)
                     }
                 })
                 .map_err(std::io::Error::from)?,
             WindowsEnableMode::CurrentUser => self
-                .enable_as_current_user()
+                .enable_with_root_key(CURRENT_USER, &command_line)
                 .map_err(std::io::Error::from)?,
-            WindowsEnableMode::System => self.enable_as_admin().map_err(std::io::Error::from)?,
+            WindowsEnableMode::System => self
+                .enable_with_root_key(LOCAL_MACHINE, &command_line)
+                .map_err(std::io::Error::from)?,
         }
         Ok(())
     }
 
-    fn enable_as_admin(&self) -> windows_registry::Result<()> {
-        self.enable_with_root_key(LOCAL_MACHINE)
-    }
-
-    fn enable_as_current_user(&self) -> windows_registry::Result<()> {
-        self.enable_with_root_key(CURRENT_USER)
-    }
-
-    fn enable_with_root_key(&self, root_key: &Key) -> windows_registry::Result<()> {
-        root_key.create(AL_REGKEY)?.set_string(
-            &self.app_name,
-            format!("{} {}", self.app_path, self.args.join(" ")),
-        )?;
+    fn enable_with_root_key(
+        &self,
+        root_key: &Key,
+        command_line: &str,
+    ) -> windows_registry::Result<()> {
+        root_key
+            .create(AL_REGKEY)?
+            .set_string(&self.app_name, command_line)?;
 
         match root_key
             .options()

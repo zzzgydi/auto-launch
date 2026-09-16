@@ -20,6 +20,7 @@ dependencies = [
  "smappservice-rs",
  "thiserror",
  "windows-registry",
+ "windows-sys",
 ]
 
 [[package]]

@@ -116,6 +116,14 @@ On Windows, it will add registry entries under:
 
 It will also detect if startup is disabled inside Task Manager or the Windows settings UI, and can re-enable after being disabled in one of those.
 
+Pass `app_path` as an unquoted executable path and each element of `args` as a
+literal argument. One surrounding pair of quotes on `app_path` is also accepted
+for compatibility with existing callers. The crate handles Windows command-line quoting, including
+spaces, empty arguments, quotes and backslashes. Arguments follow the standard
+Windows C runtime conventions used by Rust and C/C++ executables; custom command
+interpreters may use different rules. After upgrading, call `enable()` again to
+rewrite an existing startup entry with the corrected command line.
+
 Enable behavior is controlled by `WindowsEnableMode`:
 - `Dynamic` (default): try system-wide, fall back to current user on access denied
 - `CurrentUser`: write to current user only
@@ -145,6 +153,11 @@ On Linux and FreeBSD, `cargo test --test xdg_exec` uses GLib's `gio launch` to
 check that an XDG desktop entry starts the executable with its original arguments.
 Install the `gio` command before running this test. It uses a temporary home
 directory and removes its desktop entry afterwards.
+
+On Windows, `cargo test --test windows_exec` reads back a temporary current-user
+Run entry and launches that exact command with `CreateProcessW`, checking the
+executable path and received arguments. It removes its registry values and
+temporary files afterwards. This tests command parsing, not a desktop login.
 
 ## License
 

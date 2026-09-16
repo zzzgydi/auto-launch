@@ -153,6 +153,8 @@ mod linux;
 mod macos;
 #[cfg(target_os = "windows")]
 mod windows;
+#[cfg(any(target_os = "windows", test))]
+mod windows_command_line;
 
 /// The parameters of `AutoLaunch::new` are different on each platform.
 ///
