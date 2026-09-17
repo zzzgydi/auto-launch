@@ -7,6 +7,13 @@ use std::{
     process::{Command, Output},
 };
 
+// User-supplied values are passed in argv, never interpolated into source.
+const APPLESCRIPT_ENABLE: &str = r#"tell application "System Events" to make login item at end with properties {name:(item 1 of argv), path:(item 2 of argv), hidden:((item 3 of argv) is "true")}"#;
+const APPLESCRIPT_DISABLE: &str =
+    r#"tell application "System Events" to delete login item (item 1 of argv)"#;
+const APPLESCRIPT_IS_ENABLED: &str =
+    r#"tell application "System Events" to exists login item (item 1 of argv)"#;
+
 /// macOS implement
 impl AutoLaunch {
     /// Create a new AutoLaunch instance
@@ -139,14 +146,14 @@ impl AutoLaunch {
             .iter()
             .find(|arg| *arg == "--hidden" || *arg == "--minimized");
 
-        let props = format!(
-            "{{name:\"{}\",path:\"{}\",hidden:{}}}",
-            self.app_name,
-            self.app_path,
-            hidden.is_some()
-        );
-        let command = format!("make login item at end with properties {}", props);
-        let output = exec_apple_script(&command)?;
+        let output = exec_apple_script(
+            APPLESCRIPT_ENABLE,
+            &[
+                &self.app_name,
+                &self.app_path,
+                if hidden.is_some() { "true" } else { "false" },
+            ],
+        )?;
         if !output.status.success() {
             return Err(Error::AppleScriptFailed(output.status.code().unwrap_or(1)));
         }
@@ -195,8 +202,7 @@ impl AutoLaunch {
 
     /// Disable AppleScript login item
     fn disable_applescript(&self) -> Result<()> {
-        let command = format!("delete login item \"{}\"", self.app_name);
-        let output = exec_apple_script(&command)?;
+        let output = exec_apple_script(APPLESCRIPT_DISABLE, &[&self.app_name])?;
         if !output.status.success() {
             return Err(Error::AppleScriptFailed(output.status.code().unwrap_or(1)));
         }
@@ -225,18 +231,9 @@ impl AutoLaunch {
 
     /// Check if AppleScript login item is enabled
     fn is_applescript_enabled(&self) -> Result<bool> {
-        let command = "get the name of every login item";
-        let output = exec_apple_script(command)?;
-        let enable = if output.status.success() {
-            let stdout = std::str::from_utf8(&output.stdout).unwrap_or("");
-            stdout
-                .split(',')
-                .map(|x| x.trim())
-                .any(|x| x == self.app_name)
-        } else {
-            false
-        };
-        Ok(enable)
+        let output = exec_apple_script(APPLESCRIPT_IS_ENABLED, &[&self.app_name])?;
+        Ok(output.status.success()
+            && std::str::from_utf8(&output.stdout).unwrap_or("").trim() == "true")
     }
 
     /// get the plist file path
@@ -254,10 +251,11 @@ fn get_dir() -> Result<PathBuf> {
 }
 
 /// Execute the specific AppleScript
-fn exec_apple_script(cmd_suffix: &str) -> Result<Output> {
-    let command = format!("tell application \"System Events\" to {}", cmd_suffix);
+fn exec_apple_script(script: &str, args: &[&str]) -> Result<Output> {
+    let command = format!("on run argv\n{script}\nend run");
     let output = Command::new("osascript")
-        .args(vec!["-e", &command])
+        .args(["-e", &command, "--"])
+        .args(args)
         .output()?;
     Ok(output)
 }
@@ -324,6 +322,97 @@ fn escape_plist_text(value: &str) -> String {
 mod tests {
     use super::*;
     use std::process::Stdio;
+
+    #[test]
+    fn test_applescript_preserves_arguments() {
+        // Numeric character IDs avoid osascript's text/list output formatting.
+        // This runs the real transport without addressing System Events.
+        let values = [
+            "",
+            "Plain App",
+            "My \"App\"",
+            r"App\new",
+            r"App\test",
+            r"trailing\",
+            "a, b",
+            " leading and trailing ",
+            "--leading",
+            "雪😀",
+            "line\nbreak\tand\rcarriage",
+            "\" & (error \"injected\") & \"",
+        ];
+        for value in values {
+            let output = exec_apple_script("return id of (item 1 of argv)", &[value]).unwrap();
+            assert!(
+                output.status.success(),
+                "{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            let stdout = String::from_utf8(output.stdout).unwrap();
+            let actual: Vec<u32> = stdout
+                .trim()
+                .split(',')
+                .filter(|part| !part.trim().is_empty())
+                .map(|part| part.trim().parse().unwrap())
+                .collect();
+            let expected: Vec<u32> = value.chars().map(u32::from).collect();
+            assert_eq!(actual, expected, "{value:?}");
+        }
+    }
+
+    #[test]
+    fn test_applescript_login_properties() {
+        // Evaluate the production property record using the application's
+        // terminology only. No command is sent to System Events.
+        let properties = APPLESCRIPT_ENABLE.split_once("with properties ").unwrap().1;
+        let script = format!(
+            "using terms from application \"System Events\"\n\
+             set props to {properties}\n\
+             return {{(id of (name of props)) is (id of (item 1 of argv)), \
+             (id of (path of props)) is (id of (item 2 of argv)), hidden of props}}\n\
+             end using terms from"
+        );
+        for hidden in ["true", "false"] {
+            let output = exec_apple_script(
+                &script,
+                &["My \"App\", 雪", r"/Applications/A\new.app", hidden],
+            )
+            .unwrap();
+            assert!(
+                output.status.success(),
+                "{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            assert_eq!(
+                String::from_utf8(output.stdout).unwrap().trim(),
+                format!("true, true, {hidden}")
+            );
+        }
+    }
+
+    #[test]
+    fn test_applescript_login_commands_compile() {
+        // Compile the exact production commands but never execute their bodies:
+        // do not create, delete, or query the developer's actual login items.
+        for script in [
+            APPLESCRIPT_ENABLE,
+            APPLESCRIPT_DISABLE,
+            APPLESCRIPT_IS_ENABLED,
+        ] {
+            let guarded = format!("if false then\n{script}\nend if\nreturn true");
+            let output = exec_apple_script(
+                &guarded,
+                &["My \"App\"", r"/Applications/A\new.app", "true"],
+            )
+            .unwrap();
+            assert!(
+                output.status.success(),
+                "{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            assert_eq!(String::from_utf8(output.stdout).unwrap().trim(), "true");
+        }
+    }
 
     // Use Apple's parser to verify decoded values, not just serialized text.
     fn plist_value(data: &str, key: &str, kind: &str) -> String {
