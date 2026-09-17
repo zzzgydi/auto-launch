@@ -413,7 +413,8 @@ impl AutoLaunchBuilder {
         self
     }
 
-    /// Set the `agent_extra_config`
+    /// Set raw XML entries appended to the Launch Agent dictionary.
+    /// Unlike ordinary text fields, this fragment is not XML-escaped.
     /// This setting only works on macOS
     #[allow(unused_variables)]
     pub fn set_agent_extra_config(&mut self, config: &str) -> &mut Self {

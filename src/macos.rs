@@ -15,7 +15,7 @@ impl AutoLaunch {
     /// - `launch_mode`: launch mode (Launch Agent, AppleScript, or SMAppService)
     /// - `args`: startup args passed to the binary
     /// - `bundle_identifiers`: bundle identifiers
-    /// - `agent_extra_config`: extra config for Launch Agent
+    /// - `agent_extra_config`: raw XML entries appended to the Launch Agent dictionary
     ///
     /// ## Notes
     ///
@@ -26,6 +26,9 @@ impl AutoLaunch {
     ///
     /// The `app_path` should be the **absolute path** and **exists**,
     ///     otherwise it will cause an error when `enable`.
+    ///
+    /// In Launch Agent mode, pass plain strings; XML escaping is handled internally.
+    /// `agent_extra_config` remains a raw XML fragment.
     ///
     /// In case using AppleScript,
     ///     only `"--hidden"` and `"--minimized"` in `args` are valid.
@@ -271,12 +274,12 @@ fn build_launch_agent_plist(
 
     let section = full_args
         .iter()
-        .map(|x| format!("<string>{}</string>", x))
+        .map(|x| format!("<string>{}</string>", escape_plist_text(x)))
         .collect::<String>();
 
     let identifiers = bundle_identifiers
         .iter()
-        .map(|x| format!("<string>{}</string>", x))
+        .map(|x| format!("<string>{}</string>", escape_plist_text(x)))
         .collect::<String>();
 
     let extra_config = if !agent_extra_config.is_empty() {
@@ -302,16 +305,116 @@ fn build_launch_agent_plist(
         </plist>",
         r#"<?xml version="1.0" encoding="UTF-8"?>"#,
         r#"<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">"#,
-        app_name,
+        escape_plist_text(app_name),
         identifiers,
         section,
         extra_config
     )
 }
 
+// These values are XML element text, not attributes or raw plist fragments.
+fn escape_plist_text(value: &str) -> String {
+    value
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::process::Stdio;
+
+    // Use Apple's parser to verify decoded values, not just serialized text.
+    fn plist_value(data: &str, key: &str, kind: &str) -> String {
+        let mut parser = Command::new("/usr/bin/plutil")
+            .args([
+                "-extract", key, "raw", "-expect", kind, "-n", "-o", "-", "--", "-",
+            ])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+        parser
+            .stdin
+            .take()
+            .unwrap()
+            .write_all(data.as_bytes())
+            .unwrap();
+        let output = parser.wait_with_output().unwrap();
+        assert!(
+            output.status.success(),
+            "plutil failed for {key}: {}{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr),
+        );
+        String::from_utf8(output.stdout).unwrap()
+    }
+
+    #[test]
+    fn test_launch_agent_preserves_literal_text() {
+        let name = "Test & <App> \"雪\"";
+        let path = "/Applications/A&B <雪>.app/Contents/MacOS/App";
+        let args: Vec<String> = [
+            "",
+            "two words",
+            "\"double\" and 'single'",
+            "A&B",
+            "A<B",
+            "A>B",
+            "&amp;",
+            "]]>",
+            "</string><string>injected",
+            "雪😀",
+            "\\",
+            "line\nbreak\ttab",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+        let identifiers = vec!["com.example.app".into(), "literal&<value>".into()];
+        let data = build_launch_agent_plist(name, path, &args, &identifiers, "");
+
+        assert_eq!(plist_value(&data, "Label", "string"), name);
+        assert_eq!(
+            plist_value(&data, "ProgramArguments", "array"),
+            (args.len() + 1).to_string()
+        );
+        assert_eq!(plist_value(&data, "ProgramArguments.0", "string"), path);
+        for (index, expected) in args.iter().enumerate() {
+            assert_eq!(
+                plist_value(&data, &format!("ProgramArguments.{}", index + 1), "string"),
+                *expected
+            );
+        }
+        assert_eq!(
+            plist_value(&data, "AssociatedBundleIdentifiers", "array"),
+            identifiers.len().to_string()
+        );
+        for (index, expected) in identifiers.iter().enumerate() {
+            assert_eq!(
+                plist_value(
+                    &data,
+                    &format!("AssociatedBundleIdentifiers.{index}"),
+                    "string"
+                ),
+                *expected
+            );
+        }
+        assert_eq!(plist_value(&data, "RunAtLoad", "bool"), "true");
+    }
+
+    #[test]
+    fn test_launch_agent_keeps_extra_config_as_xml() {
+        let extra = "<key>KeepAlive</key><true/><key>EnvironmentVariables</key><dict><key>VALUE</key><string>A&amp;B</string></dict>";
+        let data = build_launch_agent_plist("Test", "/Applications/Test.app", &[], &[], extra);
+        assert_eq!(plist_value(&data, "KeepAlive", "bool"), "true");
+        assert_eq!(
+            plist_value(&data, "EnvironmentVariables.VALUE", "string"),
+            "A&B"
+        );
+    }
 
     #[test]
     fn test_build_launch_agent_plist() {
